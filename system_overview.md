@@ -50,7 +50,7 @@ TThis component diagram presents the system’s major building blocks—React cl
 
 The class diagram captures FlexFit’s core domain entities (User, WorkoutPlan, Session, Exercise, etc.), key enums (SportType, Difficulty, Equipment), their attributes, and relationships such as a user owning multiple plans and sessions logging performed sets.
 
-![alt text](UML_Class_diagram.png)
+![alt text](UML_class_diagram.png)
 
 **2. First Product Backlog**
 
