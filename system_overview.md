@@ -1,4 +1,4 @@
-**FlexFit – System Overview (Submission)**
+# **FlexFit – System Overview (Submission)**
 
 **1. Initial System Structure**
 
@@ -34,17 +34,23 @@ This table provides a concise summary of the components:
 | Data           | `postgres`       | Relational storage for users & plans                         | PostgreSQL 16                              |
 |                | `weaviate`       | Vector store for ~1 500 exercises                            | Weaviate 1.24                              |
 
-**1.2 Top-Level Architecture (PlantUML)**
+**1.2 Use-Case Diagram**
 
-This diagram shows the high-level components and their primary interactions.
+This diagram shows the main ways an end-user interacts with FlexFit—registering, picking a sport type, viewing a 7-day plan, starting a workout, giving RPE feedback, reviewing progress, and managing equipment.
 
-![alt text](top_level_arc.png)
+![alt text](usecase_diagram.png)
 
-**1.3 Subsystem Decomposition (PlantUML)**
+**1.3 Top-Level Architecture**
 
-This diagram details the interactions within the backend clusters and data layers.
+TThis component diagram presents the system’s major building blocks—React client, API Gateway, Spring-Boot micro-services, GenAI cluster, and data stores—and the REST/monitoring flows between them.
 
-![alt text](subsystem_decomposition.png)
+![alt text](top_level_architecture.png)
+
+**1.4 Analysis Object Model (UML Class Diagram)**
+
+The class diagram captures FlexFit’s core domain entities (User, WorkoutPlan, Session, Exercise, etc.), key enums (SportType, Difficulty, Equipment), their attributes, and relationships such as a user owning multiple plans and sessions logging performed sets.
+
+![alt text](UML_Class_diagram.png)
 
 **2. First Product Backlog**
 
