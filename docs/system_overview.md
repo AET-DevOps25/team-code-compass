@@ -4,53 +4,165 @@
 
 Describe how you plan to divide the system technically. You must cover: **Server (Spring Boot)**, **Client (React)**, **GenAI Service (Python/LangChain)**, and **Database**.
 
-FlexFit will be developed as a distributed system composed of distinct components communicating over APIs. This modular approach facilitates independent development, deployment, and scaling.
+FlexFit will be developed as a distributed system composed of distinct components communicating over APIs. This modular approach facilitates independent development, deployment, and scaling, following a **Master-Worker** pattern where Spring Boot services orchestrate business logic while specialized workers handle specific tasks.
 
-*   **Server:** The backend logic will be implemented using **Spring Boot (Java)** exposing REST APIs, likely coordinated via an API Gateway (`api-gw`). To meet the requirement of multiple microservices, the server-side will be decomposed into:
-    *   **User Service (`user-svc`):** Handles user profiles, preferences (sport type, equipment), authentication (JWT), and related data persistence.
-    *   **Workout Plan Service (`plan-svc`):** Manages the creation, storage, retrieval, and high-level modification of the 7-day workout plans. It coordinates calls to the GenAI service for adaptive adjustments.
-    *   **Session Service (Potentially part of `plan-svc` initially or separate):** Records completed workout sessions, including exercises performed, user feedback (RPE), and tracked metrics. Triggers plan updates via the Workout Plan Service.
-    *   **Metrics Service (`metrics-svc`):** Exposes application metrics (e.g., via Spring Boot Actuator) for Prometheus scraping.
-*   **Client (`client-web`):** A web-based frontend built using **React** (with Vite, MUI, TanStack Query). This provides a dynamic and responsive user interface for selecting sport types, viewing the daily workout, interacting during the session (including triggering voice cues via the browser's Web Speech API), providing feedback (RPE input), and viewing progress. It will communicate exclusively with the API Gateway.
-*   **GenAI Service (`adaptive-planner`):** A dedicated microservice built with **Python** using **FastAPI** and **LangChain**. This service encapsulates all AI-driven logic: receives context from the `plan-svc`, performs RAG lookups against Weaviate, uses an LLM (cloud or local via `llm-local`) for adaptive reasoning, applies safety guardrails, and returns updated plan details.
+**Core Architecture Principle:**
+- **Master (Spring Boot):** Orchestrates core business logic, user data management, and makes adaptive decisions. Directly calls LLMs for reasoning.
+- **Worker (Python/LangChain):** Specialized GenAI tasks, primarily RAG for exercise retrieval.
+- **Other Workers (Spring Boot):** Specialized tasks like text-to-speech synthesis.
+
+*   **Server:** The backend logic will be implemented using **Spring Boot (Java)** exposing REST APIs, coordinated via an API Gateway (`api-gateway`). The server-side is decomposed into specialized microservices:
+    *   **API Gateway (`api-gateway`):** Spring Cloud Gateway for request routing and JWT validation.
+    *   **User Service (`user-service`):** Handles user accounts, comprehensive profiles, preferences, authentication (JWT), and related data persistence.
+    *   **Workout Plan Service (`workout-plan-service`):** **Master Orchestrator** - Manages adaptive 7-day plan generation and re-optimization. Calls user-service for preferences, exercise-rag-worker for exercise candidates, and directly calls LLM APIs (GPT-4o or local Phi-3) for adaptive reasoning. Applies safety guardrails and manages plan lifecycle.
+    *   **Exercise RAG Worker (`exercise-rag-worker`):** **Python GenAI Worker** - Specialized service for exercise retrieval using RAG against Weaviate vector store.
+    *   **TTS Service (`tts-service`):** **Audio Worker** - Synthesizes voice script cue text into audio for workout guidance.
+    *   **Metrics Service (`metrics-service`):** Exposes application metrics via Spring Boot Actuator for Prometheus scraping.
+
+*   **Client (`client-web`):** A web-based frontend built using **React** (with Vite, MUI, TanStack Query). Provides a dynamic and responsive user interface for comprehensive user profile setup, sport type selection, viewing adaptive 7-day plans, real-time workout interaction, voice guidance integration, RPE feedback collection, and progress tracking. Communicates exclusively with the API Gateway.
+
+*   **GenAI Service (`exercise-rag-worker`):** A dedicated Python microservice built with **FastAPI** and **LangChain**. Receives exercise retrieval requests with criteria (sport type, muscle group, equipment), performs RAG against Weaviate, and returns candidate exercises with detailed metadata.
+
 *   **Database:**
-    *   **PostgreSQL (`postgres`):** A relational database used by the Spring Boot services (`user-svc`, `plan-svc`) to store user data, workout plans, session history, RPE scores, and progress metrics. Managed via JPA/Flyway.
-    *   **Weaviate (`weaviate`):** A vector database used by the `adaptive-planner` service, storing exercise descriptions, embeddings, and metadata (~1500 exercises) for efficient RAG retrieval.
-*   **(Optional) Local LLM Service (`llm-local`):** A container serving a GGUF model (like Phi-3 or Llama) via an interface like `llama.cpp`, allowing local LLM inference if configured, potentially requiring GPU resources.
+    *   **PostgreSQL (`postgres`):** Primary relational database storing comprehensive user profiles, preferences, workout plans, daily workouts, scheduled exercises with feedback, and all business data. Managed via JPA/Flyway with detailed schemas.
+    *   **Weaviate (`weaviate`):** Vector database storing ~1500 exercises with embeddings, sport types, muscle groups, equipment requirements, and metadata for efficient RAG retrieval.
+
+*   **(Optional) Local LLM Service (`llm-local`):** A container serving a GGUF model (like Phi-3 or Llama) via `llama.cpp`, allowing local LLM inference when configured.
 
 **1.1 Component Table**
 
-This table provides a concise summary of the components:
+This table provides a comprehensive summary of the updated components:
 
-| Layer          | Container        | Main Responsibilities                                        | Technology                                   |
-| :------------- | :--------------- | :----------------------------------------------------------- | :------------------------------------------- |
-| Presentation   | `client-web`     | Render adaptive 7-day plan, capture RPE, play TTS cues       | React + Vite, MUI, TanStack Query            |
-| Gateway        | `api-gw`         | Single origin, JWT validation, route to services             | Spring Boot 3, Spring Cloud Gateway          |
-| Micro-services | `user-svc`       | Auth, user profile & equipment                               | Spring Boot 3, JPA/Flyway                    |
-|                | `plan-svc`       | Create/adjust plans, call GenAI                              | Spring Boot 3                                |
-|                | `metrics-svc`    | `/actuator/prometheus` endpoint                              | Spring Boot Actuator                         |
-| GenAI          | `adaptive-planner` | RAG over Weaviate, GPT-4o / local Llama reasoning, safety guardrails | FastAPI + LangChain                         |
-| Optional       | `llm-local`      | Serve GGUF model via llama.cpp (GPU node)                    | CUDA 12 container                            |
-| Data           | `postgres`       | Relational storage for users & plans                         | PostgreSQL 16                              |
-|                | `weaviate`       | Vector store for ~1 500 exercises                            | Weaviate 1.24                              |
+| Layer          | Container            | Main Responsibilities                                        | Technology                                   |
+| :------------- | :------------------- | :----------------------------------------------------------- | :------------------------------------------- |
+| Presentation   | `client-web`         | Comprehensive UI for profiles, adaptive plans, workout interaction, voice guidance | React + Vite, MUI, TanStack Query            |
+| Gateway        | `api-gateway`        | Request routing, JWT validation, single origin               | Spring Cloud Gateway                         |
+| Master         | `workout-plan-service` | **Master Orchestrator** - Adaptive planning, LLM reasoning, safety guardrails | Spring Boot 3, LangChain4j                  |
+| Micro-services | `user-service`       | User accounts, comprehensive profiles, preferences, auth     | Spring Boot 3, JPA/Flyway                    |
+|                | `tts-service`        | **Audio Worker** - Text-to-speech synthesis                 | Spring Boot 3, Java TTS                      |
+|                | `metrics-service`    | Application metrics, LLM token counts, latency monitoring   | Spring Boot Actuator                         |
+| GenAI Worker   | `exercise-rag-worker` | **Python GenAI Worker** - RAG exercise retrieval from Weaviate | Python, FastAPI, LangChain                  |
+| Optional       | `llm-local`          | Local LLM inference (GPU node)                               | CUDA 12 container, llama.cpp                |
+| Data           | `postgres`           | User profiles, workout plans, sessions, feedback, business data | PostgreSQL 16                              |
+|                | `weaviate`           | Vector store for ~1500 exercises with embeddings            | Weaviate 1.24                               |
 
 **1.2 Use-Case Diagram**
 
-This diagram shows the main ways an end-user interacts with FlexFit—registering, picking a sport type, viewing a 7-day plan, starting a workout, giving RPE feedback, reviewing progress, and managing equipment.
+This diagram shows the main ways an end-user interacts with FlexFit—comprehensive profile setup, sport type selection, viewing adaptive 7-day plans, workout execution with voice guidance, RPE feedback, progress tracking, and equipment management.
 
-![alt text](usecase_diagram.png)
+![alt text](usecase_diagram.svg)
 
 **1.3 Top-Level Architecture**
 
-TThis component diagram presents the system’s major building blocks—React client, API Gateway, Spring-Boot micro-services, GenAI cluster, and data stores—and the REST/monitoring flows between them.
+This component diagram presents the system's major building blocks—React client, API Gateway, Spring Boot Master-Worker microservices, Python GenAI worker, and data stores—with the REST/monitoring flows between them.
 
-![alt text](top_level_architecture.png)
+![alt text](top_level_architecture.svg)
 
 **1.4 Analysis Object Model (UML Class Diagram)**
 
-The class diagram captures FlexFit’s core domain entities (User, WorkoutPlan, Session, Exercise, etc.), key enums (SportType, Difficulty, Equipment), their attributes, and relationships such as a user owning multiple plans and sessions logging performed sets.
+The class diagram captures FlexFit's comprehensive domain model with detailed enumerations and core entities. The model features extensive enum types for user personalization and a streamlined entity structure optimized for adaptive workout planning.
 
-![alt text](UML_class_diagram.png)
+**Core Domain Entities:**
+
+- **User**: Central entity storing account information, personal data (date_of_birth, height_cm, weight_kg, gender), and authentication details
+- **UserPreferences**: Comprehensive user profile storing fitness goals, experience level, sport preferences, available equipment, workout preferences, and health considerations
+- **DailyWorkout**: Individual workout session linked directly to a user, containing completion status, RPE feedback, and workout metadata
+- **ScheduledExercise**: Exercise instances within daily workouts, containing all exercise details generated by GenAI including descriptions, muscle groups, equipment needs, and voice cues
+
+**Enumeration Types for Personalization:**
+
+The model includes six comprehensive enumerations that drive personalized workout generation:
+- **Gender**: Inclusive gender identification (5 values)
+- **ExperienceLevel**: Training experience categories (5 levels from TRUE_BEGINNER to REHAB_POSTPARTUM)
+- **FitnessGoal**: Multiple fitness objectives (8 goal types)
+- **SportType**: Core workout categories (4 types: STRENGTH, HIIT, YOGA_MOBILITY, RUNNING_INTERVALS)
+- **EquipmentItem**: Extensive equipment inventory (25+ items from NO_EQUIPMENT to specialized gym equipment)
+- **IntensityPreference**: General workout intensity preferences (3 levels)
+
+**Key Relationships:**
+- User has one comprehensive UserPreferences profile
+- User can have multiple DailyWorkout sessions over time
+- Each DailyWorkout includes one or more ScheduledExercise instances
+- Enumerations are referenced throughout the model for consistent personalization
+
+**GenAI Integration Points:**
+- ScheduledExercise fields (exercise_name, description, muscle_groups, equipment_needed, voice_script_cue_text) are populated by the GenAI system based on user preferences and workout context
+- The model supports adaptive planning through RPE feedback collection at both workout and exercise levels
+
+![alt text](class_diagram.svg)
+
+**1.5 Enhanced Data Model & Enums**
+
+**Core Enums for User Personalization:**
+
+```java
+// Gender identification (inclusive)
+enum Gender {
+    MALE, FEMALE, NON_BINARY, PREFER_NOT_TO_SAY, OTHER
+}
+
+// Experience-based training adaptation
+enum ExperienceLevel {
+    TRUE_BEGINNER,      // Never exercised consistently
+    BEGINNER,           // <6 months consistent training
+    INTERMEDIATE,       // 6-24 months consistent training  
+    ADVANCED,           // >24 months consistent training
+    REHAB_POSTPARTUM    // Specific cautious progression needs
+}
+
+// Multiple fitness goals support
+enum FitnessGoal {
+    WEIGHT_LOSS, MUSCLE_GAIN, STRENGTH_GAIN, 
+    IMPROVE_ENDURANCE, IMPROVE_FLEXIBILITY_MOBILITY,
+    GENERAL_HEALTH_FITNESS, ATHLETIC_PERFORMANCE, 
+    STRESS_REDUCTION_WELLBEING
+}
+
+// Core sport types
+enum SportType {
+    STRENGTH, HIIT, YOGA_MOBILITY, RUNNING_INTERVALS
+}
+
+// Detailed equipment inventory
+enum EquipmentItem {
+    NO_EQUIPMENT, DUMBBELLS_PAIR_LIGHT, DUMBBELLS_PAIR_MEDIUM,
+    DUMBBELLS_PAIR_HEAVY, ADJUSTABLE_DUMBBELLS, KETTLEBELL,
+    BARBELL_WITH_PLATES, RESISTANCE_BANDS_LIGHT, RESISTANCE_BANDS_MEDIUM,
+    RESISTANCE_BANDS_HEAVY, PULL_UP_BAR, YOGA_MAT, FOAM_ROLLER,
+    JUMP_ROPE, BENCH_FLAT, BENCH_ADJUSTABLE, SQUAT_RACK,
+    TREADMILL, STATIONARY_BIKE, ELLIPTICAL, ROWING_MACHINE,
+    CABLE_MACHINE_FULL, LEG_PRESS_MACHINE, MEDICINE_BALL, STABILITY_BALL
+    // ... (extensible list)
+}
+
+// Workout timing preferences
+enum TimeOfDay {
+    MORNING, MIDDAY, AFTERNOON, EVENING, ANY_TIME
+}
+
+// General intensity preferences
+enum IntensityPreference {
+    LOW_MODERATE, MODERATE_HIGH, PUSH_TO_LIMIT
+}
+
+// Session-specific energy levels
+enum SessionEnergyLevel {
+    VERY_LOW, LOW, MODERATE, HIGH, VERY_HIGH
+}
+```
+
+**Enhanced Database Schema (PostgreSQL):**
+
+**User Service Tables:**
+- `users`: Core account and personal data (id, username, email, password_hash, date_of_birth, height_cm, weight_kg, gender, timestamps)
+- `user_preferences`: Comprehensive profile (user_id, experience_level, fitness_goals[], preferred_sport_types[], available_equipment[], workout_duration_range, intensity_preference, health_notes, disliked_exercises[])
+
+**Workout Plan Service Tables:**
+- `daily_workouts`: Individual workout sessions (id, user_id, day_date, focus_sport_type_for_the_day, completion_status, rpe_overall_feedback, cadence_metrics, completion_notes)
+- `scheduled_exercises`: Exercise instances with GenAI-generated content (id, daily_workout_id, sequence_order, exercise_name, description, applicable_sport_types[], muscle_groups_primary[], muscle_groups_secondary[], equipment_needed[], difficulty, prescribed_sets_reps_duration, voice_script_cue_text, video_url, rpe_feedback, completion_status)
+
+**Weaviate Schema:**
+- `Exercises Collection`: Reference exercise database for GenAI retrieval (exercise_id, name, description, vector_embedding, sport_types[], muscle_groups_primary[], muscle_groups_secondary[], equipment_needed[], difficulty, video_url, default_cues[])
 
 **2. First Product Backlog**
 
@@ -58,38 +170,39 @@ Prepare a simple backlog in a Markdown table or GitHub Project. Each item should
 
 | ID  | Item Type | Description                                                     | Priority | Estimate | Status      |
 | :-- | :-------- | :-------------------------------------------------------------- | :------- | :------- | :---------- |
-| F01 | Feature   | User can select one Sport Type (Strength, HIIT, etc.)           | High     | S        | To Do       |
-| T01 | Task      | Setup basic React project structure (`client-web`, Vite+MUI)    | High     | S        | To Do       |
-| T02 | Task      | Setup basic Spring Boot parent POM & mono-repo structure        | High     | M        | To Do       |
-| T03 | Task      | Implement `api-gw` skeleton (Spring Cloud Gateway)              | High     | M        | To Do       |
-| T04 | Task      | Implement basic `user-svc` (store selected sport type, CRUD)    | High     | M        | To Do       |
-| T05 | Task      | Implement basic `plan-svc` (generate static Day 0 plan)         | High     | L        | To Do       |
-| T06 | Task      | Implement `metrics-svc` (Actuator endpoint exposure)            | Medium   | S        | To Do       |
-| T07 | Task      | Setup PostgreSQL database schema (Users, Plans via Flyway)      | High     | M        | To Do       |
-| T08 | Task      | Setup basic Python/FastAPI/LangChain project (`adaptive-planner`)| High     | M        | To Do       |
-| F02 | Feature   | Display the first day's workout exercises on the client         | High     | M        | To Do       |
-| T09 | Task      | Implement basic Client UI for showing workout list              | High     | M        | To Do       |
-| T10 | Task      | Connect Client to Server (`api-gw` -> `plan-svc`) to fetch plan | High     | M        | To Do       |
-| F03 | Feature   | Basic voice guidance for one exercise name (using Web Speech API)| Medium   | M        | To Do       |
-| T11 | Task      | Implement client-side TTS trigger                             | Medium   | S        | To Do       |
-| F04 | Feature   | User can provide RPE feedback (1-10) after a session/set        | Medium   | M        | To Do       |
-| T12 | Task      | Implement RPE input UI on the client                          | Medium   | S        | To Do       |
-| T13 | Task      | Send RPE feedback from Client to `plan-svc` (or Session Svc)    | Medium   | M        | To Do       |
-| T14 | Task      | Store RPE feedback in `plan-svc`/PostgreSQL                   | Medium   | M        | To Do       |
-| T15 | Task      | Containerize `client-web` (Dockerfile)                          | High     | S        | To Do       |
-| T16 | Task      | Containerize Spring Boot Services (`api-gw`, `user-svc`, etc.)  | High     | M        | To Do       |
-| T17 | Task      | Containerize `adaptive-planner` (Dockerfile)                    | High     | M        | To Do       |
-| T18 | Task      | Create `docker-compose.yml` for local end-to-end setup          | High     | L        | To Do       |
-| T19 | Task      | Setup Weaviate instance (`weaviate`, via Docker Compose)        | Medium   | M        | To Do       |
-| T20 | Task      | Script to load initial exercise CSV data into Weaviate          | Medium   | M        | To Do       |
-| T21 | Task      | Basic `adaptive-planner` endpoint PoC (takes context, returns dummy) | Medium | L        | To Do       |
-| T22 | Task      | Connect `plan-svc` to call `adaptive-planner` service           | Medium   | M        | To Do       |
-| T23 | Task      | Setup basic GitHub Actions workflow (lint, build, basic tests)  | High     | M        | To Do       |
-| T24 | Task      | Implement basic JWT Auth flow (`client` -> `api-gw` -> `user-svc`)| High   | L        | To Do       |
-| T25 | Task      | Configure Prometheus scraping via `docker-compose`              | Medium   | S        | To Do       |
+| F01 | Feature   | User can create comprehensive profile with preferences          | High     | L        | To Do       |
+| F02 | Feature   | User can select sport types and equipment inventory             | High     | M        | To Do       |
+| T01 | Task      | Setup React project with enhanced profile forms (`client-web`) | High     | M        | To Do       |
+| T02 | Task      | Setup Spring Boot parent POM & microservices structure         | High     | M        | To Do       |
+| T03 | Task      | Implement `api-gateway` with Spring Cloud Gateway              | High     | M        | To Do       |
+| T04 | Task      | Implement `user-service` with enhanced profile schema          | High     | L        | To Do       |
+| T05 | Task      | Implement `workout-plan-service` as Master Orchestrator        | High     | XL       | To Do       |
+| T06 | Task      | Implement `exercise-rag-worker` Python service                 | High     | L        | To Do       |
+| T07 | Task      | Implement `tts-service` for voice guidance                     | Medium   | M        | To Do       |
+| T08 | Task      | Setup PostgreSQL with comprehensive schema via Flyway          | High     | L        | To Do       |
+| T09 | Task      | Setup Weaviate with exercise embeddings                        | High     | M        | To Do       |
+| F03 | Feature   | Display adaptive 7-day workout plan                            | High     | L        | To Do       |
+| F04 | Feature   | Real-time workout execution with voice guidance                 | High     | L        | To Do       |
+| F05 | Feature   | RPE feedback collection and plan adaptation                     | High     | M        | To Do       |
+| T10 | Task      | Implement LLM integration in `workout-plan-service`            | High     | L        | To Do       |
+| T11 | Task      | Connect services via API Gateway routing                       | High     | M        | To Do       |
+| T12 | Task      | Implement safety guardrails and validation logic               | High     | M        | To Do       |
+| T13 | Task      | Create comprehensive enum definitions across services           | Medium   | M        | To Do       |
+| T14 | Task      | Load initial ~1500 exercises into Weaviate                     | Medium   | M        | To Do       |
+| T15 | Task      | Containerize all microservices                                  | High     | L        | To Do       |
+| T16 | Task      | Create docker-compose.yml for full system                      | High     | L        | To Do       |
+| T17 | Task      | Implement JWT authentication flow                               | High     | L        | To Do       |
+| T18 | Task      | Setup metrics collection and Prometheus integration            | Medium   | M        | To Do       |
+| T19 | Task      | Implement client-server communication with TanStack Query      | High     | M        | To Do       |
+| T20 | Task      | Create user onboarding flow with profile setup                 | Medium   | M        | To Do       |
+| F06 | Feature   | Progress tracking and workout history visualization             | Medium   | L        | To Do       |
+| T21 | Task      | Setup GitHub Actions CI/CD pipeline                            | High     | M        | To Do       |
+| T22 | Task      | Implement error handling and logging across services           | Medium   | M        | To Do       |
+| T23 | Task      | Create API documentation and service contracts                  | Medium   | M        | To Do       |
+| T24 | Task      | Performance testing and optimization                            | Low      | L        | To Do       |
+| T25 | Task      | Setup monitoring and alerting infrastructure                    | Medium   | M        | To Do       |
 
-
-*(Priorities: High, Medium, Low. Estimates: S, M, L - relative sizing based loosely on effort/complexity)*
+*(Priorities: High, Medium, Low. Estimates: S, M, L, XL - relative sizing based on complexity and scope)*
 
 ---
 <div style="display: flex; align-items: center; border: 1px solid #ccc; padding: 10px; border-radius: 5px; background-color: #f9f9f9; margin-top: 20px;">
