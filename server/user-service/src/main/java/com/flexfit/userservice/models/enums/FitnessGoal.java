@@ -1,0 +1,12 @@
+package com.flexfit.userservice.model.enums;
+
+public enum FitnessGoal {
+    WEIGHT_LOSS,
+    MUSCLE_GAIN,
+    STRENGTH_GAIN,
+    IMPROVE_ENDURANCE,
+    IMPROVE_FLEXIBILITY_MOBILITY,
+    GENERAL_HEALTH_FITNESS,
+    ATHLETIC_PERFORMANCE,
+    STRESS_REDUCTION_WELLBEING
+}
