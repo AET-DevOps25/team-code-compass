@@ -54,6 +54,57 @@ services:
       retries: 3
       start_period: 40s
 
+      # This section defines the new service for managing workout plans.
+  workout-plan-service:
+    build:
+      context: ./server/workout-plan-service 
+      dockerfile: Dockerfile
+    container_name: flexfit-workout-plan-service
+    restart: always
+    environment:
+      DB_HOST: postgres
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      SPRING_PROFILES_ACTIVE: docker
+    ports:
+      # Exposing this service on port 8082
+      - "8082:8082"
+    depends_on:
+      postgres:
+        condition: service_healthy # Ensures the database is ready before starting
+    networks:
+      - flexfit-network
+    healthcheck:
+      # Checks if the service's actuator health endpoint is responsive.
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8082/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s # Gives the service extra time to start up initially
+
+  # GenAI Workout Worker
+  genai-workout-worker:
+    build:
+      context: ./genai # Correct path to genai directory
+      dockerfile: Dockerfile
+    container_name: flexfit-genai-workout-worker
+    restart: always
+    environment:
+      CHAIR_API_KEY: ${CHAIR_API_KEY}
+      PORT: 8000
+    ports:
+      - "8000:8000"
+    networks:
+      - flexfit-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+# Defines the shared network for all services
 networks:
   flexfit-network:
     driver: bridge
