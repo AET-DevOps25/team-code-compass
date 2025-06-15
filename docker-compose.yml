@@ -1,0 +1,63 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: flexfit-postgres
+    restart: always
+    environment:
+      # These environment variables are used to initialize the PostgreSQL database.
+      # The values are loaded from the .env file for security and flexibility.
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      # Maps the container's port 5432 to the host's port 5432.
+      # This allows external connections to the database if needed.
+      - "5432:5432"
+    volumes:
+      # Persists the database data on the host machine, so you don't lose data
+      # when the container is stopped or removed.
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - flexfit-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  user-service:
+    build:
+      context: ./server/user-service
+      dockerfile: Dockerfile
+    container_name: flexfit-user-service
+    restart: always
+    environment:
+      # Database connection settings
+      DB_HOST: postgres
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      # Spring profiles
+      SPRING_PROFILES_ACTIVE: docker
+    ports:
+      # Maps the container's port 8081 to the host's port 8081
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - flexfit-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8081/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  flexfit-network:
+    driver: bridge
+
+volumes:
+  # Defines the named volume for data persistence.
+  postgres-data:
