@@ -1,4 +1,24 @@
 services:
+  # Frontend Application
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: flexfit-client
+    restart: always
+    ports:
+      # Maps the container's port 80 to the host's port 3000
+      - "3000:80"
+    networks:
+      - flexfit-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:80/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Database Service
   postgres:
     image: postgres:16
     container_name: flexfit-postgres
@@ -25,6 +45,7 @@ services:
       timeout: 5s
       retries: 5
 
+  # Backend Services
   user-service:
     build:
       context: ./server/user-service
@@ -54,7 +75,6 @@ services:
       retries: 3
       start_period: 40s
 
-      # This section defines the new service for managing workout plans.
   workout-plan-service:
     build:
       context: ./server/workout-plan-service 
@@ -83,7 +103,7 @@ services:
       retries: 3
       start_period: 40s # Gives the service extra time to start up initially
 
-  # GenAI Workout Worker
+  # GenAI Services
   genai-workout-worker:
     build:
       context: ./genai # Correct path to genai directory
