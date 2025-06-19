@@ -1,0 +1,10 @@
+
+Midnight Pulse 
+
+| Role                     | Hex                                    | Why it helps an AI-fitness UI                                                                                                                                |
+| ------------------------ | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Primary**              | `#0F172A` (deep navy)                  | Instantly signals “serious tech” and makes charts/metrics pop. Dark primaries also feel lighter on AMOLED screens during long sessions.                      |
+| **Accent / Success**     | `#14B8A6` (lively teal)                | Reads as digital, modern, and health-oriented without the medical sterility of pure blue. Perfect for progress rings, AI recommendations, and active states. |
+| **Warning / Error**      | `#EF4444` (bright crimson)             | Clear, accessible fail state—important when an AI flags form-correction or safety alerts.                                                                    |
+| **Background / Surface** | `#F1F5F9` → `#FFFFFF`                  | Light neutrals keep data-dense views (calendars, rep tables) breathable; easy to invert for dark mode.                                                       |
+| **Text**                 | `#1E293B` on light / `#E2E8F0` on dark | Passes WCAG contrast while echoing the tech-centric palette.                                                                                                 |

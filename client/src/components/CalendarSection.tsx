@@ -283,7 +283,7 @@ export function CalendarSection({ selectedDate, onDateSelect }: CalendarSectionP
       </div>
 
       {/* Calendar Grid */}
-      <div className="flex-1 p-6">
+      <div className="flex-1 p-6 overflow-auto">
         {/* Week Day Headers */}
         <div className="grid grid-cols-7 gap-2 mb-4">
           {weekDays.map((day) => (
@@ -294,14 +294,14 @@ export function CalendarSection({ selectedDate, onDateSelect }: CalendarSectionP
         </div>
 
         {/* Calendar Days */}
-        <div className="grid grid-cols-7 gap-2 mb-6">
+        <div className="grid grid-cols-7 auto-rows-fr gap-2 mb-6 min-h-[400px]">
           {days.map((dayData, index) => (
-            <div key={index} className="relative">
+            <div key={index} className="relative min-h-[60px]">
               {dayData ? (
-                <div className="aspect-square">
+                <div className="h-full">
                   <Button
                     variant={dayData.isSelected ? "default" : "ghost"}
-                    className={`w-full h-full p-2 relative flex flex-col items-center justify-center ${
+                    className={`w-full h-full p-2 relative flex flex-col items-center justify-center min-h-[60px] ${
                       dayData.hasWorkout 
                         ? 'border-2 border-yellow-400/60 bg-white/10' 
                         : 'hover:bg-white/5'
@@ -370,7 +370,7 @@ export function CalendarSection({ selectedDate, onDateSelect }: CalendarSectionP
                   )}
                 </div>
               ) : (
-                <div className="aspect-square"></div>
+                <div className="h-full min-h-[60px]"></div>
               )}
             </div>
           ))}
