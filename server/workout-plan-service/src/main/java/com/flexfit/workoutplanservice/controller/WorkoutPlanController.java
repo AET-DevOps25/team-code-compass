@@ -9,6 +9,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/v1/plans")
 @RequiredArgsConstructor
@@ -24,5 +26,23 @@ public class WorkoutPlanController {
 
         DailyWorkoutResponse response = workoutPlanService.generateWorkoutPlan(request, bearerToken);
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/health")
+    public Map<String, String> health() {
+        return Map.of(
+            "service", "workout-plan-service",
+            "status", "UP",
+            "message", "Workout Plan service is running successfully!"
+        );
+    }
+
+    @GetMapping("/info")
+    public Map<String, String> info() {
+        return Map.of(
+            "service", "workout-plan-service",
+            "version", "1.0.0",
+            "description", "FlexFit Workout Plan Management Service"
+        );
     }
 }
