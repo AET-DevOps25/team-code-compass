@@ -12,11 +12,12 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/v1/users")
+@RequestMapping("/users")
 @RequiredArgsConstructor
 public class UserController {
 
@@ -43,5 +44,23 @@ public class UserController {
         return userService.getUserById(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/health")
+    public Map<String, String> health() {
+        return Map.of(
+            "service", "user-service",
+            "status", "UP",
+            "message", "User service is running successfully!"
+        );
+    }
+
+    @GetMapping("/info")
+    public Map<String, String> info() {
+        return Map.of(
+            "service", "user-service",
+            "version", "1.0.0",
+            "description", "FlexFit User Management Service"
+        );
     }
 }
