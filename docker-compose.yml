@@ -1,4 +1,22 @@
 services:
+  # FlexFit Client - Static Next.js App
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: flexfit-client
+    restart: always
+    ports:
+      - "3000:80"
+    networks:
+      - flexfit-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
   # Service Registry (Eureka Server)
   service-registry:
     build:
