@@ -1,4 +1,48 @@
 services:
+  # Service Registry (Eureka Server)
+  service-registry:
+    build:
+      context: ./server/service-registry
+      dockerfile: Dockerfile
+    container_name: flexfit-service-registry
+    restart: always
+    ports:
+      - "8761:8761"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+    networks:
+      - flexfit-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8761/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # API Gateway
+  api-gateway:
+    build:
+      context: ./server/api-gateway
+      dockerfile: Dockerfile
+    container_name: flexfit-api-gateway
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      EUREKA_SERVER: http://service-registry:8761/eureka
+    depends_on:
+      service-registry:
+        condition: service_healthy
+    networks:
+      - flexfit-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8000/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
   postgres:
     image: postgres:16
     container_name: flexfit-postgres
@@ -39,11 +83,15 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       # Spring profiles
       SPRING_PROFILES_ACTIVE: docker
+      # Eureka configuration
+      EUREKA_SERVER: http://service-registry:8761/eureka
     ports:
       # Maps the container's port 8081 to the host's port 8081
       - "8081:8081"
     depends_on:
       postgres:
+        condition: service_healthy
+      service-registry:
         condition: service_healthy
     networks:
       - flexfit-network
@@ -67,12 +115,16 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
       SPRING_PROFILES_ACTIVE: docker
+      # Eureka configuration
+      EUREKA_SERVER: http://service-registry:8761/eureka
     ports:
       # Exposing this service on port 8082
       - "8082:8082"
     depends_on:
       postgres:
         condition: service_healthy # Ensures the database is ready before starting
+      service-registry:
+        condition: service_healthy
     networks:
       - flexfit-network
     healthcheck:
@@ -92,13 +144,13 @@ services:
     restart: always
     environment:
       CHAIR_API_KEY: ${CHAIR_API_KEY}
-      PORT: 8000
+      PORT: 8083
     ports:
-      - "8000:8000"
+      - "8083:8083"
     networks:
       - flexfit-network
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:8083/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3

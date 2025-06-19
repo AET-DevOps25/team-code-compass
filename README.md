@@ -1,21 +1,40 @@
 # FlexFit Microservices Platform
 
-A comprehensive fitness application ecosystem built with microservices architecture. The platform includes user management, workout planning, and AI-powered workout generation services, all containerized with Docker.
+A comprehensive fitness application ecosystem built with **microservices architecture**, **service discovery**, and **API Gateway** pattern. The platform includes user management, workout planning, AI-powered workout generation, and centralized service orchestration, all containerized with Docker.
 
 ## 🏗️ Architecture Overview
 
-The FlexFit platform consists of four main services:
+The FlexFit platform follows a **Master-Worker microservices pattern** with **Service Registry** and **API Gateway**:
 
-- **User Service**: User registration, authentication, and profile management
-- **Workout Plan Service**: Workout planning, scheduling, and exercise management  
-- **GenAI Workout Worker**: AI-powered personalized workout generation
+### Core Infrastructure Services:
+- **Service Registry (Eureka Server)**: Service discovery and health monitoring
+- **API Gateway**: Single entry point, request routing, and load balancing
 - **PostgreSQL Database**: Centralized data storage for all services
+
+### Business Logic Services:
+- **User Service**: User registration, authentication, and profile management
+- **Workout Plan Service**: Master orchestrator for workout planning and AI integration  
+- **GenAI Workout Worker**: AI-powered personalized workout generation worker
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Docker & Docker Compose
+- Docker & Docker Compose (V2 - uses `docker compose`, not `docker-compose`)
 - Git
+
+### 📝 Important: Docker Command Syntax
+```bash
+# ✅ CORRECT - Use this (Docker Compose V2)
+docker compose up --build -d
+
+# ❌ WRONG - This won't work (Docker Compose V1 - deprecated)  
+docker-compose up --build -d
+```
+
+**Command Flags Explained:**
+- `--build`: Rebuilds images before starting (important for code changes)
+- `-d`: **Detached mode** - runs in background, gives you terminal back
+- Without `-d`: **Foreground mode** - shows live logs, blocks terminal
 
 ### 1. Clone and Setup
 ```bash
@@ -35,15 +54,18 @@ CHAIR_API_KEY=your_chair_api_key_here
 ### 3. Start All Services
 ```bash
 # Start all services (Database + All Microservices)
-docker compose up -d
+# -d flag runs in background (detached mode)
+docker compose up --build -d
 
-# View logs for all services
+# View logs for all services (live stream)
 docker compose logs -f
 
 # View logs for specific service
-docker compose logs -f user-service
-docker compose logs -f workout-plan-service
-docker compose logs -f genai-workout-worker
+docker compose logs -f service-registry      # Eureka Server
+docker compose logs -f api-gateway           # API Gateway
+docker compose logs -f user-service          # User Service  
+docker compose logs -f workout-plan-service  # Workout Service
+docker compose logs -f genai-workout-worker  # AI Worker
 
 # Stop all services
 docker compose down
@@ -54,17 +76,22 @@ docker compose down
 ### Service Overview
 | Service | Port | Status | Description |
 |---------|------|--------|-------------|
+| **Service Registry** | `8761` | ✅ Healthy | Eureka Server - Service discovery |
+| **API Gateway** | `8000` | ✅ Healthy | Spring Cloud Gateway - Request routing |
 | **PostgreSQL** | `5432` | ✅ Healthy | Database server |
 | **User Service** | `8081` | ✅ Healthy | User management API |
 | **Workout Plan Service** | `8082` | ✅ Running | Workout planning API |
-| **GenAI Workout Worker** | `8000` | ✅ Healthy | AI workout generation |
+| **GenAI Workout Worker** | `8083` | ✅ Healthy | AI workout generation |
 
 ### Container Details
+- **Service Registry**: Spring Boot 3.5.0 with Netflix Eureka Server
+- **API Gateway**: Spring Boot 3.5.0 with Spring Cloud Gateway
 - **Database**: `postgres:16` with persistent storage and health checks
-- **User Service**: Spring Boot 3.5.0 with Eclipse Temurin JDK 21
-- **Workout Plan Service**: Spring Boot 3.5.0 with Eclipse Temurin JDK 21
+- **User Service**: Spring Boot 3.5.0 with Eclipse Temurin JDK 21 + Eureka Client
+- **Workout Plan Service**: Spring Boot 3.5.0 with Eclipse Temurin JDK 21 + Eureka Client
 - **GenAI Worker**: Python 3.11 with FastAPI and LangChain
 - **Network**: `flexfit-network` for inter-service communication
+- **Service Discovery**: Automatic service registration and discovery via Eureka
 - **Health Checks**: All services include comprehensive health monitoring
 
 ### Useful Docker Commands
@@ -92,20 +119,31 @@ docker compose restart workout-plan-service
 
 ### 🔗 Service Endpoints
 
-#### User Service (Port 8081)
+#### Service Registry - Eureka Server (Port 8761)
+- **Eureka Dashboard**: http://localhost:8761
+- **Registered Services**: http://localhost:8761/eureka/apps
+- **Health Check**: http://localhost:8761/actuator/health
+
+#### API Gateway (Port 8000) - **Single Entry Point**
+- **Health Check**: http://localhost:8000/actuator/health
+- **Gateway Routes**: http://localhost:8000/actuator/gateway/routes
+- **User Service via Gateway**: http://localhost:8000/api/users/**
+- **Workout Service via Gateway**: http://localhost:8000/api/workout-plans/**
+
+#### User Service (Port 8081) - **Direct Access**
 - **Swagger UI**: http://localhost:8081/swagger-ui/index.html
 - **OpenAPI JSON**: http://localhost:8081/v3/api-docs
 - **Health Check**: http://localhost:8081/actuator/health
 - **Root**: http://localhost:8081/
 
-#### Workout Plan Service (Port 8082)
+#### Workout Plan Service (Port 8082) - **Direct Access**
 - **Swagger UI**: http://localhost:8082/swagger-ui/index.html
 - **OpenAPI JSON**: http://localhost:8082/v3/api-docs
 - **Root**: http://localhost:8082/
 
-#### GenAI Workout Worker (Port 8000)
-- **Health Check**: http://localhost:8000/health
-- **Generate Endpoint**: http://localhost:8000/generate
+#### GenAI Workout Worker (Port 8083)
+- **Health Check**: http://localhost:8083/health
+- **Generate Endpoint**: http://localhost:8083/generate
 
 ### 📋 Available API Endpoints
 
@@ -152,7 +190,7 @@ curl -X POST http://localhost:8081/api/v1/users/register \
 
 #### Generate AI Workout
 ```bash
-curl -X POST http://localhost:8000/generate \
+curl -X POST http://localhost:8083/generate \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer your-token" \
   -d '{
@@ -164,10 +202,18 @@ curl -X POST http://localhost:8000/generate \
 
 #### Health Checks
 ```bash
-# Check all services
-curl http://localhost:8081/actuator/health
-curl http://localhost:8082/actuator/health  
-curl http://localhost:8000/health
+# Check infrastructure services
+curl http://localhost:8761/actuator/health  # Service Registry
+curl http://localhost:8000/actuator/health  # API Gateway
+
+# Check business services (direct access)
+curl http://localhost:8081/actuator/health  # User Service
+curl http://localhost:8082/actuator/health  # Workout Plan Service
+curl http://localhost:8083/health           # GenAI Worker
+
+# Check services via API Gateway (recommended)
+curl http://localhost:8000/api/users/health
+curl http://localhost:8000/api/workout-plans/health
 ```
 
 ## 🛠️ Development
@@ -225,35 +271,52 @@ team-code-compass/
 - **`docker`**: Container environment with optimized settings
 
 ### Service Communication
-Services communicate through the `flexfit-network` Docker network:
-- User Service → Database: `postgres:5432`
-- Workout Plan Service → Database: `postgres:5432`
-- Workout Plan Service → GenAI Worker: `flexfit-genai-workout-worker:8000`
-- Workout Plan Service → User Service: `flexfit-user-service:8081`
+Services communicate through the `flexfit-network` Docker network with **Service Discovery**:
+- **Service Registry (Eureka)**: `service-registry:8761` - Central service discovery
+- **API Gateway**: `api-gateway:8000` - Routes to registered services  
+- **User Service → Database**: `postgres:5432`
+- **Workout Plan Service → Database**: `postgres:5432`
+- **Workout Plan Service → GenAI Worker**: `flexfit-genai-workout-worker:8083`
+- **All services register with Eureka** for automatic discovery and load balancing
 
 ## 🔍 Troubleshooting
 
 ### Common Issues
 
-1. **Port conflicts**: Ensure ports 8000, 8081, 8082, and 5432 are available
+1. **Port conflicts**: Ensure ports 5432, 8000, 8081, 8082, 8083, and 8761 are available
 2. **Database connection**: Verify `.env` file exists and has correct credentials
 3. **Container startup**: Check logs with `docker compose logs <service-name>`
 4. **Missing API key**: Ensure `CHAIR_API_KEY` is set in `.env` file
+5. **Service registration**: Services may take 30-60s to register with Eureka after startup
+6. **Command not found**: Use `docker compose` (not `docker-compose`) - V2 syntax
 
 ### Service Status Check
 ```bash
 # Check if all services are running
 docker compose ps
 
-# Test all service connectivity
+# Test infrastructure services first
+curl http://localhost:8761/actuator/health  # Service Registry (Eureka)
+curl http://localhost:8000/actuator/health  # API Gateway
+
+# Test business services (direct access)
 curl http://localhost:8081/actuator/health  # User Service
-curl http://localhost:8082/actuator/health  # Workout Plan Service (may show 404, but service is running)
-curl http://localhost:8000/health           # GenAI Worker
+curl http://localhost:8082/actuator/health  # Workout Plan Service
+curl http://localhost:8083/health           # GenAI Worker
+
+# Test via API Gateway (recommended approach)
+curl http://localhost:8000/api/users/health
+curl http://localhost:8000/api/workout-plans/health
+
+# View registered services in Eureka
+curl http://localhost:8761/eureka/apps -H "Accept: application/json"
 
 # Test database connectivity
 docker exec flexfit-postgres pg_isready -U flexfit
 
 # Check service logs for errors
+docker compose logs --tail=50 service-registry
+docker compose logs --tail=50 api-gateway
 docker compose logs --tail=50 user-service
 docker compose logs --tail=50 workout-plan-service
 docker compose logs --tail=50 genai-workout-worker
@@ -308,12 +371,18 @@ docker compose logs workout-plan-service | grep ERROR
 
 1. ✅ Clone the repository
 2. ✅ Create `.env` file with required variables
-3. ✅ Run `docker compose up -d`
-4. ✅ Verify all services are healthy: `docker compose ps`
-5. ✅ Access Swagger UIs:
+3. ✅ Run `docker compose up --build -d` (note: `--build` flag and `-d` for background)
+4. ✅ Wait for services to start (30-60 seconds for full registration)
+5. ✅ Verify all services are healthy: `docker compose ps`
+6. ✅ Check Service Registry: http://localhost:8761 (view registered services)
+7. ✅ Test API Gateway: http://localhost:8000/actuator/health
+8. ✅ Access Swagger UIs:
    - User Service: http://localhost:8081/swagger-ui/index.html
    - Workout Plan Service: http://localhost:8082/swagger-ui/index.html
-6. ✅ Test GenAI Worker: http://localhost:8000/health
+9. ✅ Test GenAI Worker: http://localhost:8083/health
+10. ✅ Test API Gateway routing:
+    - `curl http://localhost:8000/api/users/health`
+    - `curl http://localhost:8000/api/workout-plans/health`
 
 ---
 

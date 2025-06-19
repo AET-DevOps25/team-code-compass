@@ -1,0 +1,65 @@
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      routes:
+        - id: user-service
+          uri: lb://user-service
+          predicates:
+            - Path=/api/users/**
+          filters:
+            - StripPrefix=1
+
+        - id: workout-plan-service
+          uri: lb://workout-plan-service
+          predicates:
+            - Path=/api/workout-plans/**
+          filters:
+            - StripPrefix=1
+
+        # Swagger UI routes for easy access via gateway
+        - id: user-service-docs
+          uri: lb://user-service
+          predicates:
+            - Path=/docs/users/**
+          filters:
+            - StripPrefix=2
+            - RewritePath=/docs/users/(?<remaining>.*), /${remaining}
+            - AddRequestHeader=X-Forwarded-Host, localhost:8000
+            - AddRequestHeader=X-Forwarded-Proto, http
+            - AddRequestHeader=X-Forwarded-Prefix, /docs/users
+
+        - id: workout-plan-service-docs
+          uri: lb://workout-plan-service
+          predicates:
+            - Path=/docs/workout-plans/**
+          filters:
+            - StripPrefix=2
+            - RewritePath=/docs/workout-plans/(?<remaining>.*), /${remaining}
+            - AddRequestHeader=X-Forwarded-Host, localhost:8000
+            - AddRequestHeader=X-Forwarded-Proto, http
+            - AddRequestHeader=X-Forwarded-Prefix, /docs/workout-plans
+
+      discovery:
+        locator:
+          enabled: true
+          lower-case-service-id: true
+
+server:
+  port: ${PORT:8000}
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_SERVER:http://localhost:8761/eureka}
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway 
