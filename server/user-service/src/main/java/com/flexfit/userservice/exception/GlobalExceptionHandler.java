@@ -21,6 +21,14 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Handles authentication errors (invalid credentials).
+     */
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<Map<String, String>> handleIllegalArgumentException(IllegalArgumentException ex) {
+        return new ResponseEntity<>(Map.of("error", ex.getMessage()), HttpStatus.UNAUTHORIZED);
+    }
+
+    /**
      * Handles validation errors from request bodies (e.g., @Valid).
      */
     @ExceptionHandler(MethodArgumentNotValidException.class)
