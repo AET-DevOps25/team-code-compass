@@ -118,10 +118,93 @@ async def generate_workout(context: PromptContext, authorization: Optional[str] 
     if not authorization:
         raise HTTPException(status_code=401, detail="Authorization header is required.")
     
+    # TEMPORARY: Return mock data for testing instead of calling external API
     try:
-        context_str = json.dumps(context.dict(), indent=2)
-        response = chain.invoke({"context": context_str})
+        # Extract sport type from context for personalization
+        sport_type = context.daily_focus.get("focus_sport_type_for_the_day", "STRENGTH")
+        day_date = context.daily_focus.get("day_date", "2025-06-29")
+        
+        # Create mock workout plan based on sport type
+        mock_exercises = []
+        if sport_type == "STRENGTH":
+            mock_exercises = [
+                GenAIExercise(
+                    sequence_order=1,
+                    exercise_name="Push-ups",
+                    description="Classic bodyweight exercise targeting chest, shoulders, and triceps",
+                    applicable_sport_types=["STRENGTH"],
+                    muscle_groups_primary=["chest", "triceps"],
+                    muscle_groups_secondary=["shoulders", "core"],
+                    equipment_needed=["NO_EQUIPMENT"],
+                    difficulty="Beginner",
+                    prescribed_sets_reps_duration="3 sets of 10-15 reps",
+                    voice_script_cue_text="Start in plank position, lower chest to ground, push back up",
+                    video_url="https://example.com/pushups"
+                ),
+                GenAIExercise(
+                    sequence_order=2,
+                    exercise_name="Squats",
+                    description="Fundamental lower body exercise targeting quads, glutes, and hamstrings",
+                    applicable_sport_types=["STRENGTH"],
+                    muscle_groups_primary=["quadriceps", "glutes"],
+                    muscle_groups_secondary=["hamstrings", "calves"],
+                    equipment_needed=["NO_EQUIPMENT"],
+                    difficulty="Beginner",
+                    prescribed_sets_reps_duration="3 sets of 12-20 reps",
+                    voice_script_cue_text="Feet shoulder-width apart, lower hips back and down, drive through heels to stand",
+                    video_url="https://example.com/squats"
+                ),
+                GenAIExercise(
+                    sequence_order=3,
+                    exercise_name="Plank",
+                    description="Core strengthening exercise that builds stability and endurance",
+                    applicable_sport_types=["STRENGTH"],
+                    muscle_groups_primary=["core", "abs"],
+                    muscle_groups_secondary=["shoulders", "back"],
+                    equipment_needed=["NO_EQUIPMENT"],
+                    difficulty="Beginner",
+                    prescribed_sets_reps_duration="3 sets of 30-60 seconds",
+                    voice_script_cue_text="Hold straight line from head to heels, engage core, breathe steadily",
+                    video_url="https://example.com/plank"
+                )
+            ]
+        else:
+            # Default exercises for other sport types
+            mock_exercises = [
+                GenAIExercise(
+                    sequence_order=1,
+                    exercise_name="Jumping Jacks",
+                    description="Full body cardio exercise",
+                    applicable_sport_types=[sport_type],
+                    muscle_groups_primary=["full_body"],
+                    muscle_groups_secondary=["cardiovascular"],
+                    equipment_needed=["NO_EQUIPMENT"],
+                    difficulty="Beginner",
+                    prescribed_sets_reps_duration="3 sets of 30 seconds",
+                    voice_script_cue_text="Jump feet apart while raising arms overhead, return to start",
+                    video_url="https://example.com/jumping-jacks"
+                )
+            ]
+        
+        mock_workout = GenAIDailyWorkout(
+            day_date=day_date,
+            focus_sport_type_for_the_day=sport_type,
+            scheduled_exercises=mock_exercises
+        )
+        
+        response = GenAIResponse(daily_workout=mock_workout)
+        print(f"Generated mock workout for {sport_type} on {day_date}")
         return response
+        
     except Exception as e:
-        print(f"Error during LangChain invocation: {e}")
+        print(f"Error generating mock workout: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to generate workout plan: {str(e)}")
+
+    # Original implementation (commented out for testing)
+    # try:
+    #     context_str = json.dumps(context.dict(), indent=2)
+    #     response = chain.invoke({"context": context_str})
+    #     return response
+    # except Exception as e:
+    #     print(f"Error during LangChain invocation: {e}")
+    #     raise HTTPException(status_code=500, detail=f"Failed to generate workout plan: {str(e)}")
