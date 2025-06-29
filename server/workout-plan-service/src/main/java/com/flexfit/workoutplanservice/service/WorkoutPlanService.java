@@ -79,9 +79,9 @@ public class WorkoutPlanService {
         
         Map<String, Object> userProfileMap = Map.of(
             "age", age,
-            "gender", user.gender(),
-            "height_cm", user.heightCm(),
-            "weight_kg", user.weightKg()
+            "gender", user.gender() != null ? user.gender() : "UNKNOWN",
+            "height_cm", user.heightCm() != null ? user.heightCm() : 180,
+            "weight_kg", user.weightKg() != null ? user.weightKg() : 75
         );
         
         Map<String, Object> dailyFocusMap = Map.of(
