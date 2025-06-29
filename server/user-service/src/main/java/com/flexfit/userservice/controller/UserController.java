@@ -17,7 +17,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/users")
+@RequestMapping("/api/v1/users")
 @RequiredArgsConstructor
 public class UserController {
 
@@ -32,7 +32,7 @@ public class UserController {
     @GetMapping("/me")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<UserResponse> getCurrentUser(@AuthenticationPrincipal Jwt jwt) {
-        String userEmail = jwt.getClaimAsString("email");
+        String userEmail = jwt.getSubject(); // Email is stored as subject in JWT
         return userService.getUserByEmail(userEmail)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
