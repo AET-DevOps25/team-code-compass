@@ -22,12 +22,13 @@ COPY workout-worker.py .
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
 USER appuser
 
-# Expose port
+# Expose port (default 8000, but can be overridden by environment)
 EXPOSE 8000
+EXPOSE 8083
 
-# Health check
+# Health check - use PORT environment variable if available
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+    CMD curl -f http://localhost:${PORT:-8000}/health || exit 1
 
-# Run the application
-CMD ["uvicorn", "workout-worker:app", "--host", "0.0.0.0", "--port", "8000"] 
+# Run the application - use PORT environment variable if available
+CMD ["sh", "-c", "uvicorn workout-worker:app --host 0.0.0.0 --port ${PORT:-8000}"] 
