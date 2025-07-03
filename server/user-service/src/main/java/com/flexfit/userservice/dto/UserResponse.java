@@ -1,6 +1,6 @@
 package com.flexfit.userservice.dto;
 
-import com.flexfit.userservice.model.enums.Gender;
+import com.flexfit.userservice.models.enums.Gender;
 import lombok.Data;
 import java.time.LocalDate;
 import java.time.LocalDateTime;

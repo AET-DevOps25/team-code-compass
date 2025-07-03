@@ -1,4 +1,4 @@
-package com.flexfit.userservice.model.enums;
+package com.flexfit.userservice.models.enums;
 
 public enum EquipmentItem {
     NO_EQUIPMENT, DUMBBELLS_PAIR_LIGHT, DUMBBELLS_PAIR_MEDIUM,

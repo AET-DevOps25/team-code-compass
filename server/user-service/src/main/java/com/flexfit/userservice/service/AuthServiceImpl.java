@@ -3,7 +3,7 @@ package com.flexfit.userservice.service;
 import com.flexfit.userservice.dto.AuthResponse;
 import com.flexfit.userservice.dto.LoginRequest;
 import com.flexfit.userservice.dto.UserResponse;
-import com.flexfit.userservice.model.User;
+import com.flexfit.userservice.models.User;
 import com.flexfit.userservice.repository.UserRepository;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;

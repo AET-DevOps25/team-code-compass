@@ -1,6 +1,6 @@
 package com.flexfit.userservice.dto;
 
-import com.flexfit.userservice.model.enums.*;
+import com.flexfit.userservice.models.enums.*;
 import lombok.Data;
 import java.util.List;
 

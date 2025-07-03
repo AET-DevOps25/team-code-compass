@@ -1,4 +1,4 @@
-package com.flexfit.userservice.model.enums;
+package com.flexfit.userservice.models.enums;
 
 public enum FitnessGoal {
     WEIGHT_LOSS,

@@ -1,6 +1,6 @@
 package com.flexfit.userservice.dto;
 
-import com.flexfit.userservice.model.enums.Gender;
+import com.flexfit.userservice.models.enums.Gender;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;

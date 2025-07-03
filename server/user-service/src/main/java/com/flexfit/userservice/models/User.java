@@ -1,6 +1,6 @@
-package com.flexfit.userservice.model;
+package com.flexfit.userservice.models;
 
-import com.flexfit.userservice.model.enums.Gender;
+import com.flexfit.userservice.models.enums.Gender;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
