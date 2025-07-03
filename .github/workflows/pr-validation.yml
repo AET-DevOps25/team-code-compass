@@ -167,13 +167,15 @@ jobs:
 
       - name: 🧪 Run Unit Tests - GenAI Service
         if: matrix.service == 'genai-service'
+        env:
+          CHAIR_API_KEY: ${{ secrets.CHAIR_API_KEY }}
         run: |
           cd genai
           python -m pytest test_workout_worker.py -v
           echo "✅ GenAI Service unit tests completed"
 
       - name: 📊 Upload test results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: pr-unit-test-results-${{ matrix.service }}
@@ -222,6 +224,8 @@ jobs:
           pip install pytest requests fastapi uvicorn
 
       - name: 🐳 Start services
+        env:
+          CHAIR_API_KEY: ${{ secrets.CHAIR_API_KEY }}
         run: |
           echo "🚀 Starting services for integration testing..."
           docker compose up -d --build

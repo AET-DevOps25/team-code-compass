@@ -113,6 +113,8 @@ jobs:
           pip install pytest requests fastapi uvicorn
 
       - name: 🧪 Run Unit Tests
+        env:
+          CHAIR_API_KEY: ${{ secrets.CHAIR_API_KEY }}
         run: |
           echo "🧪 Running all unit tests..."
           cd server/user-service && ./mvnw test -q
@@ -121,6 +123,8 @@ jobs:
           echo "✅ All unit tests passed"
 
       - name: 🐳 Start services for integration testing
+        env:
+          CHAIR_API_KEY: ${{ secrets.CHAIR_API_KEY }}
         run: |
           echo "🚀 Starting all services for production testing..."
           docker compose up -d --build
@@ -198,7 +202,7 @@ jobs:
 
   # Job 4: Build Production Artifacts
   build-production:
-    name: 🏗️ Build Production Artifacts
+    name: 🏗️ Build Production
     runs-on: ubuntu-latest
     needs: [comprehensive-testing, security-compliance]
     if: always() && (needs.comprehensive-testing.result == 'success' || needs.comprehensive-testing.result == 'skipped') && needs.security-compliance.result == 'success'
@@ -245,7 +249,7 @@ jobs:
           echo "✅ Deployment package created"
 
       - name: 📊 Upload production artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: production-artifacts-${{ github.event.inputs.version }}
           path: |
@@ -287,7 +291,7 @@ jobs:
           ref: production
 
       - name: 📦 Download production artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: production-artifacts-${{ github.event.inputs.version }}
 
@@ -361,7 +365,7 @@ jobs:
           echo "✅ Deployment record created"
 
       - name: 📊 Upload deployment record
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: deployment-record-${{ github.event.inputs.version }}
           path: deployment-record.md
