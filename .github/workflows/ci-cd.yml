@@ -131,9 +131,8 @@ jobs:
       - name: 🧪 Run Java Unit Tests
         run: |
           echo "🧪 Running Java unit tests..."
-          cd server/user-service && ./mvnw test -X
-          cd ../workout-plan-service && ./mvnw test -X
-          echo "✅ Java unit tests completed"
+          chmod +x run-ci-tests.sh
+          ./run-ci-tests.sh
 
       - name: 🧪 Run Python Unit Tests
         continue-on-error: true
