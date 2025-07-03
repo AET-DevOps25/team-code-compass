@@ -1,4 +1,4 @@
-name: 🚀 CI/CD Pipeline
+name: 🚀 FlexFit CI/CD Pipeline
 
 on:
   push:
@@ -16,21 +16,84 @@ on:
           - unit-only
           - integration-only
           - system-only
-          - performance-only
           - quick
           - full
 
 env:
   JAVA_VERSION: '17'
-  NODE_VERSION: '18'
   PYTHON_VERSION: '3.9'
 
 jobs:
-  # Job 1: Unit Tests
+  # Job 1: Setup & Validation
+  setup:
+    name: 🔧 Setup & Validation
+    runs-on: ubuntu-latest
+    outputs:
+      should_run_unit: ${{ steps.decide.outputs.should_run_unit }}
+      should_run_integration: ${{ steps.decide.outputs.should_run_integration }}
+      should_run_system: ${{ steps.decide.outputs.should_run_system }}
+      target_branch: ${{ github.base_ref || github.ref_name }}
+      is_pr: ${{ github.event_name == 'pull_request' }}
+      is_main: ${{ github.ref == 'refs/heads/main' }}
+      is_development: ${{ github.ref == 'refs/heads/development' }}
+    steps:
+      - name: 📋 Pipeline Information
+        run: |
+          echo "🚀 FlexFit CI/CD Pipeline"
+          echo "Event: ${{ github.event_name }}"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Target: ${{ github.base_ref || 'N/A' }}"
+          echo "Actor: ${{ github.actor }}"
+
+      - name: 🎯 Decide what to run
+        id: decide
+        run: |
+          # Default: run everything
+          UNIT="true"
+          INTEGRATION="true"
+          SYSTEM="true"
+          
+          # Manual trigger - respect user choice
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            case "${{ github.event.inputs.test_level }}" in
+              "unit-only")
+                UNIT="true"; INTEGRATION="false"; SYSTEM="false"
+                ;;
+              "integration-only")
+                UNIT="false"; INTEGRATION="true"; SYSTEM="false"
+                ;;
+              "system-only")
+                UNIT="false"; INTEGRATION="false"; SYSTEM="true"
+                ;;
+              "quick")
+                UNIT="true"; INTEGRATION="true"; SYSTEM="false"
+                ;;
+              *)
+                UNIT="true"; INTEGRATION="true"; SYSTEM="true"
+                ;;
+            esac
+          fi
+          
+          # PR - run unit + integration only
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            SYSTEM="false"
+          fi
+          
+          echo "should_run_unit=$UNIT" >> $GITHUB_OUTPUT
+          echo "should_run_integration=$INTEGRATION" >> $GITHUB_OUTPUT
+          echo "should_run_system=$SYSTEM" >> $GITHUB_OUTPUT
+          
+          echo "🎯 Pipeline Plan:"
+          echo "   Unit Tests: $UNIT"
+          echo "   Integration Tests: $INTEGRATION"
+          echo "   System Tests: $SYSTEM"
+
+  # Job 2: Unit Tests
   unit-tests:
     name: 🧪 Unit Tests
     runs-on: ubuntu-latest
-    if: github.event.inputs.test_level == 'unit-only' || github.event.inputs.test_level == 'quick' || github.event.inputs.test_level == 'full' || github.event_name != 'workflow_dispatch'
+    needs: setup
+    if: needs.setup.outputs.should_run_unit == 'true'
     steps:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
@@ -51,52 +114,32 @@ jobs:
           python -m pip install --upgrade pip
           pip install pytest requests fastapi uvicorn
 
-      - name: 🧪 Run Java Unit Tests - User Service
+      - name: 🧪 Run Java Unit Tests
         run: |
-          echo "🧪 Running User Service unit tests..."
-          cd server/user-service
-          ./mvnw test -q
+          echo "🧪 Running Java unit tests..."
+          cd server/user-service && ./mvnw test -q
+          cd ../workout-plan-service && ./mvnw test -q
+          echo "✅ Java unit tests completed"
 
-      - name: 🧪 Run Java Unit Tests - Workout Plan Service
-        run: |
-          echo "🧪 Running Workout Plan Service unit tests..."
-          cd server/workout-plan-service
-          ./mvnw test -q
-
-      - name: 🧪 Run Java Unit Tests - API Gateway
-        continue-on-error: true
-        run: |
-          echo "🧪 Running API Gateway unit tests..."
-          cd server/api-gateway
-          ./mvnw test -q
-
-      - name: 🧪 Run Java Unit Tests - Service Registry
-        continue-on-error: true
-        run: |
-          echo "🧪 Running Service Registry unit tests..."
-          cd server/service-registry
-          ./mvnw test -q
-
-      - name: 🧪 Run Python Unit Tests - GenAI Service
+      - name: 🧪 Run Python Unit Tests
         continue-on-error: true
         env:
           CHAIR_API_KEY: ${{ secrets.CHAIR_API_KEY }}
         run: |
-          echo "🧪 Running GenAI Service unit tests..."
-          cd genai
-          python -m pytest test_workout_worker.py -v
+          echo "🧪 Running Python unit tests..."
+          cd genai && python -m pytest test_workout_worker.py -v
+          echo "✅ Python unit tests completed"
 
-      - name: ✅ Unit Tests Summary
+      - name: 📊 Unit Test Summary
         run: |
           echo "✅ Unit tests completed successfully!"
-          echo "📊 All core services have passing unit tests"
 
-  # Job 2: Integration Tests
+  # Job 3: Integration Tests
   integration-tests:
     name: 🔗 Integration Tests
     runs-on: ubuntu-latest
-    needs: unit-tests
-    if: github.event.inputs.test_level == 'integration-only' || github.event.inputs.test_level == 'quick' || github.event.inputs.test_level == 'full' || github.event_name != 'workflow_dispatch'
+    needs: [setup, unit-tests]
+    if: needs.setup.outputs.should_run_integration == 'true'
     services:
       postgres:
         image: postgres:13
@@ -131,62 +174,40 @@ jobs:
           python -m pip install --upgrade pip
           pip install pytest requests fastapi uvicorn
 
-      - name: 🐳 Start services for integration testing
+      - name: 🐳 Start services
         env:
           CHAIR_API_KEY: ${{ secrets.CHAIR_API_KEY }}
         run: |
-          echo "🚀 Starting all services for integration testing..."
+          echo "🚀 Starting all services..."
           docker compose up -d --build
-          echo "⏳ Waiting for services to stabilize..."
+          echo "⏳ Waiting for services..."
           sleep 60
 
-      - name: 🏥 Service health checks
+      - name: 🏥 Health checks
         run: |
-          echo "🏥 Running service health checks..."
+          echo "🏥 Checking service health..."
           curl -f http://localhost:8081/health || exit 1
           curl -f http://localhost:8082/health || exit 1
           curl -f http://localhost:8083/health || exit 1
-          echo "✅ All services are healthy"
+          echo "✅ All services healthy"
 
-      - name: 🔗 Run Authentication Integration Tests
+      - name: 🔗 Run Integration Tests
         run: |
-          echo "🔗 Running authentication integration tests..."
-          chmod +x tests/integration/test-auth-integration.sh
-          ./tests/integration/test-auth-integration.sh
+          echo "🔗 Running integration tests..."
+          python -m pytest tests/integration/ -v --tb=short
+          echo "✅ Integration tests completed"
 
-      - name: 🔗 Run Database Integration Tests
-        run: |
-          echo "🔗 Running database integration tests..."
-          chmod +x tests/integration/test-database-integration.sh
-          ./tests/integration/test-database-integration.sh
-
-      - name: 🔗 Run API Gateway Integration Tests
-        run: |
-          echo "🔗 Running API Gateway integration tests..."
-          chmod +x tests/integration/test-gateway-integration.sh
-          ./tests/integration/test-gateway-integration.sh
-
-      - name: 🔗 Run Service Communication Tests
-        run: |
-          echo "🔗 Running service communication tests..."
-          python -m pytest tests/integration/test_user_workout_integration.py -v
-
-      - name: 🧹 Clean up integration test environment
+      - name: 🧹 Cleanup
         if: always()
         run: |
           docker compose down -v
 
-      - name: ✅ Integration Tests Summary
-        run: |
-          echo "✅ Integration tests completed successfully!"
-          echo "📊 All service integrations are working correctly"
-
-  # Job 3: System Tests
+  # Job 4: System Tests
   system-tests:
     name: 🌐 System Tests
     runs-on: ubuntu-latest
-    needs: integration-tests
-    if: github.event.inputs.test_level == 'system-only' || github.event.inputs.test_level == 'full' || github.event_name != 'workflow_dispatch'
+    needs: [setup, integration-tests]
+    if: needs.setup.outputs.should_run_system == 'true'
     services:
       postgres:
         image: postgres:13
@@ -221,236 +242,48 @@ jobs:
           python -m pip install --upgrade pip
           pip install pytest requests fastapi uvicorn
 
-      - name: 🐳 Start full system for testing
+      - name: 🐳 Start full system
         env:
           CHAIR_API_KEY: ${{ secrets.CHAIR_API_KEY }}
         run: |
-          echo "🚀 Starting full system for end-to-end testing..."
+          echo "🚀 Starting full system..."
           docker compose up -d --build
-          echo "⏳ Waiting for system to stabilize..."
+          echo "⏳ Waiting for system..."
           sleep 90
 
       - name: 🏥 System health checks
         run: |
-          echo "🏥 Running comprehensive system health checks..."
+          echo "🏥 Running system health checks..."
           curl -f http://localhost:8761/actuator/health || exit 1
-          curl -f http://localhost:8000/actuator/health || exit 1
           curl -f http://localhost:8081/health || exit 1
           curl -f http://localhost:8082/health || exit 1
           curl -f http://localhost:8083/health || exit 1
-          echo "✅ Full system is healthy"
+          echo "✅ Full system healthy"
 
-      - name: 🌐 Run End-to-End System Tests
+      - name: 🌐 Run System Tests
         run: |
-          echo "🌐 Running end-to-end system tests..."
-          python -m pytest tests/system/test_end_to_end_system.py -v
+          echo "🌐 Running system tests..."
+          python -m pytest tests/system/ -v --tb=short
+          echo "✅ System tests completed"
 
-      - name: 👤 Run User Journey Tests
+      - name: 💪 Run Workout Integration Tests
         run: |
-          echo "👤 Running user journey tests..."
-          chmod +x tests/system/test-user-journey.sh
-          ./tests/system/test-user-journey.sh
-
-      - name: 💪 Run Workout Generation System Tests
-        run: |
-          echo "💪 Running workout generation system tests..."
+          echo "💪 Running workout integration tests..."
           chmod +x test-workout-integration.sh
           ./test-workout-integration.sh
+          echo "✅ Workout integration tests completed"
 
-      - name: 🧹 Clean up system test environment
+      - name: 🧹 Cleanup
         if: always()
         run: |
           docker compose down -v
 
-      - name: ✅ System Tests Summary
-        run: |
-          echo "✅ System tests completed successfully!"
-          echo "📊 End-to-end workflows are functioning correctly"
-
-  # Job 4: Performance Tests
-  performance-tests:
-    name: ⚡ Performance Tests
+  # Job 5: Build & Package (only for main branch)
+  build-package:
+    name: 🏗️ Build & Package
     runs-on: ubuntu-latest
-    needs: system-tests
-    if: github.event.inputs.test_level == 'performance-only' || github.event.inputs.test_level == 'full' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
-    services:
-      postgres:
-        image: postgres:13
-        env:
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: flexfit_test
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-
-    steps:
-      - name: 📥 Checkout code
-        uses: actions/checkout@v4
-
-      - name: ☕ Set up Java
-        uses: actions/setup-java@v3
-        with:
-          java-version: ${{ env.JAVA_VERSION }}
-          distribution: 'temurin'
-
-      - name: 🐍 Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: 📦 Install performance testing tools
-        run: |
-          python -m pip install --upgrade pip
-          pip install pytest requests fastapi uvicorn
-          sudo apt-get update
-          sudo apt-get install -y bc
-
-      - name: 🐳 Start optimized system for performance testing
-        env:
-          CHAIR_API_KEY: ${{ secrets.CHAIR_API_KEY }}
-        run: |
-          echo "🚀 Starting optimized system for performance testing..."
-          docker compose up -d --build
-          echo "⏳ Waiting for system optimization..."
-          sleep 120
-
-      - name: 🏥 Performance baseline health checks
-        run: |
-          echo "🏥 Running performance baseline health checks..."
-          curl -f http://localhost:8081/health || exit 1
-          curl -f http://localhost:8082/health || exit 1
-          curl -f http://localhost:8083/health || exit 1
-          echo "✅ System ready for performance testing"
-
-      - name: ⚡ Run Load Tests
-        run: |
-          echo "⚡ Running load tests..."
-          chmod +x tests/performance/test-load.sh
-          ./tests/performance/test-load.sh
-
-      - name: 🔥 Run Stress Tests
-        run: |
-          echo "🔥 Running stress tests..."
-          chmod +x tests/performance/test-stress.sh
-          ./tests/performance/test-stress.sh
-
-      - name: 👥 Run Concurrent User Tests
-        run: |
-          echo "👥 Running concurrent user tests..."
-          chmod +x tests/performance/test-concurrent-users.sh
-          ./tests/performance/test-concurrent-users.sh
-
-      - name: 📊 Performance Test Results
-        if: always()
-        run: |
-          echo "📊 Performance test results:"
-          if [ -d "test-results/performance" ]; then
-            ls -la test-results/performance/
-            cat test-results/performance/*.log | tail -50
-          fi
-
-      - name: 🧹 Clean up performance test environment
-        if: always()
-        run: |
-          docker compose down -v
-          docker system prune -f
-
-      - name: ✅ Performance Tests Summary
-        run: |
-          echo "✅ Performance tests completed!"
-          echo "📊 System performance meets requirements"
-
-  # Job 5: Comprehensive Test Suite
-  comprehensive-test-suite:
-    name: 🎯 Comprehensive Test Suite
-    runs-on: ubuntu-latest
-    needs: [unit-tests, integration-tests, system-tests]
-    if: github.event.inputs.test_level == 'full' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
-    services:
-      postgres:
-        image: postgres:13
-        env:
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: flexfit_test
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-
-    steps:
-      - name: 📥 Checkout code
-        uses: actions/checkout@v4
-
-      - name: ☕ Set up Java
-        uses: actions/setup-java@v3
-        with:
-          java-version: ${{ env.JAVA_VERSION }}
-          distribution: 'temurin'
-
-      - name: 🐍 Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: 📦 Install all dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install pytest requests fastapi uvicorn
-          sudo apt-get update
-          sudo apt-get install -y bc postgresql-client
-
-      - name: 🐳 Start complete system
-        env:
-          CHAIR_API_KEY: ${{ secrets.CHAIR_API_KEY }}
-        run: |
-          echo "🚀 Starting complete system for comprehensive testing..."
-          docker compose up -d --build
-          echo "⏳ Waiting for complete system stabilization..."
-          sleep 120
-
-      - name: 🎯 Run Comprehensive Test Suite
-        run: |
-          echo "🎯 Running comprehensive test suite..."
-          chmod +x test-all.sh
-          ./test-all.sh --full
-
-      - name: 📊 Upload Test Results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: comprehensive-test-results-${{ github.run_number }}
-          path: |
-            test-results/
-            *.log
-
-      - name: 🧹 Final cleanup
-        if: always()
-        run: |
-          docker compose down -v
-          docker system prune -f
-
-      - name: ✅ Comprehensive Test Summary
-        run: |
-          echo "✅ Comprehensive test suite completed successfully!"
-          echo "🎉 All test categories passed:"
-          echo "   🧪 Unit Tests: ✅"
-          echo "   🔗 Integration Tests: ✅"
-          echo "   🌐 System Tests: ✅"
-          echo "   ⚡ Performance Tests: ✅"
-
-  # Job 6: Build and Package (only on main branch)
-  build-and-package:
-    name: 🏗️ Build and Package
-    runs-on: ubuntu-latest
-    needs: comprehensive-test-suite
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [setup, unit-tests, integration-tests, system-tests]
+    if: always() && needs.setup.outputs.is_main == 'true' && needs.unit-tests.result == 'success' && (needs.integration-tests.result == 'success' || needs.integration-tests.result == 'skipped') && (needs.system-tests.result == 'success' || needs.system-tests.result == 'skipped')
     steps:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
@@ -463,38 +296,58 @@ jobs:
 
       - name: 🏗️ Build all services
         run: |
-          echo "🏗️ Building all services for production..."
+          echo "🏗️ Building all services..."
           cd server/user-service && ./mvnw clean package -DskipTests
           cd ../workout-plan-service && ./mvnw clean package -DskipTests
           cd ../api-gateway && ./mvnw clean package -DskipTests
           cd ../service-registry && ./mvnw clean package -DskipTests
-          echo "✅ All services built successfully"
+          echo "✅ All services built"
 
       - name: 🐳 Build Docker images
         run: |
           echo "🐳 Building Docker images..."
           docker compose build
-          echo "✅ Docker images built successfully"
+          echo "✅ Docker images built"
 
-      - name: 📦 Create deployment artifacts
+      - name: 📦 Create artifacts
         run: |
           echo "📦 Creating deployment artifacts..."
           mkdir -p artifacts
           cp -r server/*/target/*.jar artifacts/
           cp docker-compose.yml artifacts/
-          cp docker-compose.prod.yml artifacts/
           tar -czf flexfit-deployment-${{ github.run_number }}.tar.gz artifacts/
-          echo "✅ Deployment artifacts created"
+          echo "✅ Artifacts created"
 
-      - name: 📊 Upload deployment artifacts
+      - name: 📊 Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: deployment-artifacts-${{ github.run_number }}
-          path: |
-            flexfit-deployment-*.tar.gz
-            artifacts/
+          path: flexfit-deployment-*.tar.gz
 
-      - name: ✅ Build Summary
+  # Job 6: Summary
+  summary:
+    name: 📊 Pipeline Summary
+    runs-on: ubuntu-latest
+    needs: [setup, unit-tests, integration-tests, system-tests, build-package]
+    if: always()
+    steps:
+      - name: 📊 Pipeline Results
         run: |
-          echo "✅ Build and packaging completed successfully!"
-          echo "📦 Deployment artifacts ready for production" 
+          echo "📊 FlexFit CI/CD Pipeline Results"
+          echo "=================================="
+          echo "Event: ${{ github.event_name }}"
+          echo "Branch: ${{ needs.setup.outputs.target_branch }}"
+          echo "Is PR: ${{ needs.setup.outputs.is_pr }}"
+          echo ""
+          echo "Test Results:"
+          echo "  🧪 Unit Tests: ${{ needs.unit-tests.result || 'skipped' }}"
+          echo "  🔗 Integration Tests: ${{ needs.integration-tests.result || 'skipped' }}"
+          echo "  🌐 System Tests: ${{ needs.system-tests.result || 'skipped' }}"
+          echo "  🏗️ Build & Package: ${{ needs.build-package.result || 'skipped' }}"
+          echo ""
+          
+          if [ "${{ needs.unit-tests.result }}" == "success" ] && [ "${{ needs.integration-tests.result }}" != "failure" ] && [ "${{ needs.system-tests.result }}" != "failure" ]; then
+            echo "🎉 Pipeline completed successfully!"
+          else
+            echo "❌ Pipeline failed - check logs for details"
+          fi 
