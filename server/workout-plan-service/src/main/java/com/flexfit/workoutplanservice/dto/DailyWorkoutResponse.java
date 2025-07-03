@@ -17,5 +17,6 @@ public class DailyWorkoutResponse {
     private CompletionStatus completionStatus;
     private Integer rpeOverallFeedback;
     private String completionNotes;
+    private String markdownContent;
     private List<ScheduledExerciseResponse> scheduledExercises;
 }
