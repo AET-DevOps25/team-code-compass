@@ -1,20 +1,21 @@
 package com.flexfit.userservice.service;
 
+import com.flexfit.userservice.dto.UserRegistrationRequest;
 import com.flexfit.userservice.dto.UserResponse;
 import com.flexfit.userservice.models.User;
 import com.flexfit.userservice.models.UserPreferences;
-import com.flexfit.userservice.models.enums.*;
+import com.flexfit.userservice.models.enums.Gender;
 import com.flexfit.userservice.repository.UserRepository;
-import com.flexfit.userservice.repository.UserPreferencesRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDate;
-import java.util.List;
+import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -29,13 +30,13 @@ class UserServiceTest {
     private UserRepository userRepository;
 
     @Mock
-    private UserPreferencesRepository userPreferencesRepository;
+    private PasswordEncoder passwordEncoder;
 
     @InjectMocks
     private UserServiceImpl userService;
 
     private User testUser;
-    private UserPreferences testPreferences;
+    private UserRegistrationRequest registrationRequest;
     private UUID testUserId;
 
     @BeforeEach
@@ -46,58 +47,122 @@ class UserServiceTest {
         testUser.setId(testUserId);
         testUser.setUsername("testuser");
         testUser.setEmail("test@example.com");
-        testUser.setPassword("encodedPassword");
-        testUser.setFirstName("Test");
-        testUser.setLastName("User");
+        testUser.setPasswordHash("encodedPassword");
         testUser.setDateOfBirth(LocalDate.of(1990, 1, 1));
-        testUser.setAge(33);
         testUser.setGender(Gender.MALE);
-        testUser.setHeight(180);
-        testUser.setWeight(75);
+        testUser.setHeightCm(180);
+        testUser.setWeightKg(75.0);
+        testUser.setCreatedAt(LocalDateTime.now());
 
-        testPreferences = new UserPreferences();
-        testPreferences.setId(UUID.randomUUID());
-        testPreferences.setUser(testUser);
-        testPreferences.setExperienceLevel(ExperienceLevel.INTERMEDIATE);
-        testPreferences.setFitnessGoals(List.of(FitnessGoal.MUSCLE_GAIN, FitnessGoal.WEIGHT_LOSS));
-        testPreferences.setPreferredSportTypes(List.of(SportType.STRENGTH));
-        testPreferences.setAvailableEquipment(List.of(EquipmentItem.DUMBBELLS));
-        testPreferences.setWorkoutDurationRange("30-45 minutes");
-        testPreferences.setIntensityPreference(IntensityPreference.MODERATE);
-        testPreferences.setHealthNotes("No injuries");
-        testPreferences.setDislikedExercises(List.of());
+        // Create empty preferences for the user
+        UserPreferences preferences = new UserPreferences();
+        testUser.setPreferences(preferences);
+
+        registrationRequest = new UserRegistrationRequest();
+        registrationRequest.setUsername("testuser");
+        registrationRequest.setEmail("test@example.com");
+        registrationRequest.setPassword("password123");
+        registrationRequest.setDateOfBirth(LocalDate.of(1990, 1, 1));
+        registrationRequest.setGender(Gender.MALE);
+        registrationRequest.setHeightCm(180);
+        registrationRequest.setWeightKg(75.0);
     }
 
     @Test
-    void findById_UserExists() {
+    void registerUser_Success() {
+        // Given
+        when(userRepository.findByUsername(registrationRequest.getUsername())).thenReturn(Optional.empty());
+        when(userRepository.findByEmail(registrationRequest.getEmail())).thenReturn(Optional.empty());
+        when(passwordEncoder.encode(registrationRequest.getPassword())).thenReturn("encodedPassword");
+        when(userRepository.save(any(User.class))).thenReturn(testUser);
+
+        // When
+        UserResponse result = userService.registerUser(registrationRequest);
+
+        // Then
+        assertNotNull(result);
+        assertEquals(testUserId, result.getId());
+        assertEquals("testuser", result.getUsername());
+        assertEquals("test@example.com", result.getEmail());
+        assertEquals(LocalDate.of(1990, 1, 1), result.getDateOfBirth());
+        assertEquals(Gender.MALE, result.getGender());
+        assertEquals(180, result.getHeightCm());
+        assertEquals(75.0, result.getWeightKg());
+        assertNotNull(result.getCreatedAt());
+        assertNotNull(result.getPreferences());
+
+        verify(userRepository).findByUsername("testuser");
+        verify(userRepository).findByEmail("test@example.com");
+        verify(passwordEncoder).encode("password123");
+        verify(userRepository).save(any(User.class));
+    }
+
+    @Test
+    void registerUser_UsernameAlreadyExists() {
+        // Given
+        when(userRepository.findByUsername(registrationRequest.getUsername())).thenReturn(Optional.of(testUser));
+
+        // When & Then
+        IllegalStateException exception = assertThrows(
+            IllegalStateException.class,
+            () -> userService.registerUser(registrationRequest)
+        );
+        assertEquals("Username already exists", exception.getMessage());
+
+        verify(userRepository).findByUsername("testuser");
+        verify(userRepository, never()).findByEmail(anyString());
+        verify(passwordEncoder, never()).encode(anyString());
+        verify(userRepository, never()).save(any(User.class));
+    }
+
+    @Test
+    void registerUser_EmailAlreadyExists() {
+        // Given
+        when(userRepository.findByUsername(registrationRequest.getUsername())).thenReturn(Optional.empty());
+        when(userRepository.findByEmail(registrationRequest.getEmail())).thenReturn(Optional.of(testUser));
+
+        // When & Then
+        IllegalStateException exception = assertThrows(
+            IllegalStateException.class,
+            () -> userService.registerUser(registrationRequest)
+        );
+        assertEquals("Email already registered", exception.getMessage());
+
+        verify(userRepository).findByUsername("testuser");
+        verify(userRepository).findByEmail("test@example.com");
+        verify(passwordEncoder, never()).encode(anyString());
+        verify(userRepository, never()).save(any(User.class));
+    }
+
+    @Test
+    void getUserById_UserExists() {
         // Given
         when(userRepository.findById(testUserId)).thenReturn(Optional.of(testUser));
 
         // When
-        Optional<UserResponse> result = userService.findById(testUserId);
+        Optional<UserResponse> result = userService.getUserById(testUserId);
 
         // Then
         assertTrue(result.isPresent());
         UserResponse userResponse = result.get();
-        assertEquals(testUserId, userResponse.id());
-        assertEquals("testuser", userResponse.username());
-        assertEquals("test@example.com", userResponse.email());
-        assertEquals("Test", userResponse.firstName());
-        assertEquals("User", userResponse.lastName());
-        assertEquals(Gender.MALE, userResponse.gender());
-        assertEquals(180, userResponse.heightCm());
-        assertEquals(75, userResponse.weightKg());
+        assertEquals(testUserId, userResponse.getId());
+        assertEquals("testuser", userResponse.getUsername());
+        assertEquals("test@example.com", userResponse.getEmail());
+        assertEquals(LocalDate.of(1990, 1, 1), userResponse.getDateOfBirth());
+        assertEquals(Gender.MALE, userResponse.getGender());
+        assertEquals(180, userResponse.getHeightCm());
+        assertEquals(75.0, userResponse.getWeightKg());
 
         verify(userRepository).findById(testUserId);
     }
 
     @Test
-    void findById_UserNotExists() {
+    void getUserById_UserNotExists() {
         // Given
         when(userRepository.findById(testUserId)).thenReturn(Optional.empty());
 
         // When
-        Optional<UserResponse> result = userService.findById(testUserId);
+        Optional<UserResponse> result = userService.getUserById(testUserId);
 
         // Then
         assertFalse(result.isPresent());
@@ -105,29 +170,30 @@ class UserServiceTest {
     }
 
     @Test
-    void findByEmail_UserExists() {
+    void getUserByEmail_UserExists() {
         // Given
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
 
         // When
-        Optional<UserResponse> result = userService.findByEmail("test@example.com");
+        Optional<UserResponse> result = userService.getUserByEmail("test@example.com");
 
         // Then
         assertTrue(result.isPresent());
         UserResponse userResponse = result.get();
-        assertEquals("test@example.com", userResponse.email());
-        assertEquals("testuser", userResponse.username());
+        assertEquals("test@example.com", userResponse.getEmail());
+        assertEquals("testuser", userResponse.getUsername());
+        assertEquals(testUserId, userResponse.getId());
 
         verify(userRepository).findByEmail("test@example.com");
     }
 
     @Test
-    void findByEmail_UserNotExists() {
+    void getUserByEmail_UserNotExists() {
         // Given
         when(userRepository.findByEmail("nonexistent@example.com")).thenReturn(Optional.empty());
 
         // When
-        Optional<UserResponse> result = userService.findByEmail("nonexistent@example.com");
+        Optional<UserResponse> result = userService.getUserByEmail("nonexistent@example.com");
 
         // Then
         assertFalse(result.isPresent());
@@ -135,325 +201,115 @@ class UserServiceTest {
     }
 
     @Test
-    void findByUsername_UserExists() {
+    void registerUser_WithoutOptionalFields() {
         // Given
-        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(testUser));
+        UserRegistrationRequest minimalRequest = new UserRegistrationRequest();
+        minimalRequest.setUsername("minimaluser");
+        minimalRequest.setEmail("minimal@example.com");
+        minimalRequest.setPassword("password123");
+        minimalRequest.setDateOfBirth(LocalDate.of(1995, 5, 15));
+        minimalRequest.setGender(Gender.FEMALE);
+        // heightCm and weightKg are null
+
+        User minimalUser = new User();
+        minimalUser.setId(UUID.randomUUID());
+        minimalUser.setUsername("minimaluser");
+        minimalUser.setEmail("minimal@example.com");
+        minimalUser.setPasswordHash("encodedPassword");
+        minimalUser.setDateOfBirth(LocalDate.of(1995, 5, 15));
+        minimalUser.setGender(Gender.FEMALE);
+        minimalUser.setHeightCm(null);
+        minimalUser.setWeightKg(null);
+        minimalUser.setCreatedAt(LocalDateTime.now());
+        minimalUser.setPreferences(new UserPreferences());
+
+        when(userRepository.findByUsername(minimalRequest.getUsername())).thenReturn(Optional.empty());
+        when(userRepository.findByEmail(minimalRequest.getEmail())).thenReturn(Optional.empty());
+        when(passwordEncoder.encode(minimalRequest.getPassword())).thenReturn("encodedPassword");
+        when(userRepository.save(any(User.class))).thenReturn(minimalUser);
 
         // When
-        Optional<UserResponse> result = userService.findByUsername("testuser");
+        UserResponse result = userService.registerUser(minimalRequest);
 
         // Then
-        assertTrue(result.isPresent());
-        UserResponse userResponse = result.get();
-        assertEquals("testuser", userResponse.username());
-        assertEquals("test@example.com", userResponse.email());
+        assertNotNull(result);
+        assertEquals("minimaluser", result.getUsername());
+        assertEquals("minimal@example.com", result.getEmail());
+        assertEquals(Gender.FEMALE, result.getGender());
+        assertNull(result.getHeightCm());
+        assertNull(result.getWeightKg());
 
-        verify(userRepository).findByUsername("testuser");
-    }
-
-    @Test
-    void findByUsername_UserNotExists() {
-        // Given
-        when(userRepository.findByUsername("nonexistent")).thenReturn(Optional.empty());
-
-        // When
-        Optional<UserResponse> result = userService.findByUsername("nonexistent");
-
-        // Then
-        assertFalse(result.isPresent());
-        verify(userRepository).findByUsername("nonexistent");
-    }
-
-    @Test
-    void findUserWithPreferences_UserAndPreferencesExist() {
-        // Given
-        when(userRepository.findById(testUserId)).thenReturn(Optional.of(testUser));
-        when(userPreferencesRepository.findByUserId(testUserId)).thenReturn(Optional.of(testPreferences));
-
-        // When
-        Optional<UserResponse> result = userService.findUserWithPreferences(testUserId);
-
-        // Then
-        assertTrue(result.isPresent());
-        UserResponse userResponse = result.get();
-        assertNotNull(userResponse.preferences());
-        assertEquals(ExperienceLevel.INTERMEDIATE, userResponse.preferences().experienceLevel());
-        assertEquals(2, userResponse.preferences().fitnessGoals().size());
-        assertTrue(userResponse.preferences().fitnessGoals().contains(FitnessGoal.MUSCLE_GAIN));
-        assertTrue(userResponse.preferences().fitnessGoals().contains(FitnessGoal.WEIGHT_LOSS));
-
-        verify(userRepository).findById(testUserId);
-        verify(userPreferencesRepository).findByUserId(testUserId);
-    }
-
-    @Test
-    void findUserWithPreferences_UserExistsButNoPreferences() {
-        // Given
-        when(userRepository.findById(testUserId)).thenReturn(Optional.of(testUser));
-        when(userPreferencesRepository.findByUserId(testUserId)).thenReturn(Optional.empty());
-
-        // When
-        Optional<UserResponse> result = userService.findUserWithPreferences(testUserId);
-
-        // Then
-        assertTrue(result.isPresent());
-        UserResponse userResponse = result.get();
-        assertNull(userResponse.preferences());
-
-        verify(userRepository).findById(testUserId);
-        verify(userPreferencesRepository).findByUserId(testUserId);
-    }
-
-    @Test
-    void findUserWithPreferences_UserNotExists() {
-        // Given
-        when(userRepository.findById(testUserId)).thenReturn(Optional.empty());
-
-        // When
-        Optional<UserResponse> result = userService.findUserWithPreferences(testUserId);
-
-        // Then
-        assertFalse(result.isPresent());
-
-        verify(userRepository).findById(testUserId);
-        verify(userPreferencesRepository, never()).findByUserId(any());
-    }
-
-    @Test
-    void existsByEmail_EmailExists() {
-        // Given
-        when(userRepository.existsByEmail("test@example.com")).thenReturn(true);
-
-        // When
-        boolean result = userService.existsByEmail("test@example.com");
-
-        // Then
-        assertTrue(result);
-        verify(userRepository).existsByEmail("test@example.com");
-    }
-
-    @Test
-    void existsByEmail_EmailNotExists() {
-        // Given
-        when(userRepository.existsByEmail("nonexistent@example.com")).thenReturn(false);
-
-        // When
-        boolean result = userService.existsByEmail("nonexistent@example.com");
-
-        // Then
-        assertFalse(result);
-        verify(userRepository).existsByEmail("nonexistent@example.com");
-    }
-
-    @Test
-    void existsByUsername_UsernameExists() {
-        // Given
-        when(userRepository.existsByUsername("testuser")).thenReturn(true);
-
-        // When
-        boolean result = userService.existsByUsername("testuser");
-
-        // Then
-        assertTrue(result);
-        verify(userRepository).existsByUsername("testuser");
-    }
-
-    @Test
-    void existsByUsername_UsernameNotExists() {
-        // Given
-        when(userRepository.existsByUsername("nonexistent")).thenReturn(false);
-
-        // When
-        boolean result = userService.existsByUsername("nonexistent");
-
-        // Then
-        assertFalse(result);
-        verify(userRepository).existsByUsername("nonexistent");
-    }
-
-    @Test
-    void updateUser_Success() {
-        // Given
-        User updatedUser = new User();
-        updatedUser.setId(testUserId);
-        updatedUser.setUsername("updateduser");
-        updatedUser.setEmail("updated@example.com");
-        updatedUser.setFirstName("Updated");
-        updatedUser.setLastName("User");
-        updatedUser.setAge(34);
-        updatedUser.setHeight(185);
-        updatedUser.setWeight(80);
-
-        when(userRepository.findById(testUserId)).thenReturn(Optional.of(testUser));
-        when(userRepository.save(any(User.class))).thenReturn(updatedUser);
-
-        // When
-        Optional<UserResponse> result = userService.updateUser(testUserId, updatedUser);
-
-        // Then
-        assertTrue(result.isPresent());
-        UserResponse userResponse = result.get();
-        assertEquals("updateduser", userResponse.username());
-        assertEquals("updated@example.com", userResponse.email());
-        assertEquals("Updated", userResponse.firstName());
-        assertEquals("User", userResponse.lastName());
-        assertEquals(34, userResponse.age());
-        assertEquals(185, userResponse.heightCm());
-        assertEquals(80, userResponse.weightKg());
-
-        verify(userRepository).findById(testUserId);
+        verify(userRepository).findByUsername("minimaluser");
+        verify(userRepository).findByEmail("minimal@example.com");
+        verify(passwordEncoder).encode("password123");
         verify(userRepository).save(any(User.class));
     }
 
     @Test
-    void updateUser_UserNotFound() {
-        // Given
-        User updatedUser = new User();
-        when(userRepository.findById(testUserId)).thenReturn(Optional.empty());
+    void registerUser_NullRequest() {
+        // When & Then
+        assertThrows(
+            NullPointerException.class,
+            () -> userService.registerUser(null)
+        );
 
-        // When
-        Optional<UserResponse> result = userService.updateUser(testUserId, updatedUser);
-
-        // Then
-        assertFalse(result.isPresent());
-        verify(userRepository).findById(testUserId);
+        verify(userRepository, never()).findByUsername(anyString());
+        verify(userRepository, never()).findByEmail(anyString());
+        verify(passwordEncoder, never()).encode(anyString());
         verify(userRepository, never()).save(any(User.class));
     }
 
     @Test
-    void deleteUser_Success() {
+    void getUserById_NullId() {
         // Given
-        when(userRepository.existsById(testUserId)).thenReturn(true);
+        when(userRepository.findById(null)).thenReturn(Optional.empty());
 
         // When
-        boolean result = userService.deleteUser(testUserId);
+        Optional<UserResponse> result = userService.getUserById(null);
 
         // Then
-        assertTrue(result);
-        verify(userRepository).existsById(testUserId);
-        verify(userRepository).deleteById(testUserId);
+        assertFalse(result.isPresent());
+        verify(userRepository).findById(null);
     }
 
     @Test
-    void deleteUser_UserNotFound() {
+    void getUserByEmail_NullEmail() {
+        // When
+        Optional<UserResponse> result = userService.getUserByEmail(null);
+
+        // Then
+        assertFalse(result.isPresent());
+        verify(userRepository).findByEmail(null);
+    }
+
+    @Test
+    void getUserByEmail_EmptyEmail() {
         // Given
-        when(userRepository.existsById(testUserId)).thenReturn(false);
+        when(userRepository.findByEmail("")).thenReturn(Optional.empty());
 
         // When
-        boolean result = userService.deleteUser(testUserId);
+        Optional<UserResponse> result = userService.getUserByEmail("");
 
         // Then
-        assertFalse(result);
-        verify(userRepository).existsById(testUserId);
-        verify(userRepository, never()).deleteById(any());
-    }
-
-    @Test
-    void getAllUsers() {
-        // Given
-        User user2 = new User();
-        user2.setId(UUID.randomUUID());
-        user2.setUsername("user2");
-        user2.setEmail("user2@example.com");
-        user2.setFirstName("User");
-        user2.setLastName("Two");
-        user2.setGender(Gender.FEMALE);
-
-        List<User> users = List.of(testUser, user2);
-        when(userRepository.findAll()).thenReturn(users);
-
-        // When
-        List<UserResponse> result = userService.getAllUsers();
-
-        // Then
-        assertEquals(2, result.size());
-        assertEquals("testuser", result.get(0).username());
-        assertEquals("user2", result.get(1).username());
-
-        verify(userRepository).findAll();
-    }
-
-    @Test
-    void getUserCount() {
-        // Given
-        when(userRepository.count()).thenReturn(5L);
-
-        // When
-        long result = userService.getUserCount();
-
-        // Then
-        assertEquals(5L, result);
-        verify(userRepository).count();
-    }
-
-    @Test
-    void findById_NullId() {
-        // When & Then
-        assertThrows(IllegalArgumentException.class, () -> userService.findById(null));
-        verify(userRepository, never()).findById(any());
-    }
-
-    @Test
-    void findByEmail_NullEmail() {
-        // When & Then
-        assertThrows(IllegalArgumentException.class, () -> userService.findByEmail(null));
-        verify(userRepository, never()).findByEmail(any());
-    }
-
-    @Test
-    void findByEmail_EmptyEmail() {
-        // When & Then
-        assertThrows(IllegalArgumentException.class, () -> userService.findByEmail(""));
-        verify(userRepository, never()).findByEmail(any());
-    }
-
-    @Test
-    void findByUsername_NullUsername() {
-        // When & Then
-        assertThrows(IllegalArgumentException.class, () -> userService.findByUsername(null));
-        verify(userRepository, never()).findByUsername(any());
-    }
-
-    @Test
-    void findByUsername_EmptyUsername() {
-        // When & Then
-        assertThrows(IllegalArgumentException.class, () -> userService.findByUsername(""));
-        verify(userRepository, never()).findByUsername(any());
+        assertFalse(result.isPresent());
+        verify(userRepository).findByEmail("");
     }
 
     @Test
     void convertToUserResponse_WithPreferences() {
+        // This is tested implicitly through the other tests since it's a private method
+        // The conversion logic is verified through registerUser and getUserById tests
+        
         // Given
-        testUser.setPreferences(testPreferences);
+        when(userRepository.findById(testUserId)).thenReturn(Optional.of(testUser));
 
         // When
-        UserResponse result = userService.convertToUserResponse(testUser);
+        Optional<UserResponse> result = userService.getUserById(testUserId);
 
         // Then
-        assertNotNull(result);
-        assertEquals(testUserId, result.id());
-        assertEquals("testuser", result.username());
-        assertEquals("test@example.com", result.email());
-        assertNotNull(result.preferences());
-        assertEquals(ExperienceLevel.INTERMEDIATE, result.preferences().experienceLevel());
-    }
-
-    @Test
-    void convertToUserResponse_WithoutPreferences() {
-        // When
-        UserResponse result = userService.convertToUserResponse(testUser);
-
-        // Then
-        assertNotNull(result);
-        assertEquals(testUserId, result.id());
-        assertEquals("testuser", result.username());
-        assertEquals("test@example.com", result.email());
-        assertNull(result.preferences());
-    }
-
-    @Test
-    void convertToUserResponse_NullUser() {
-        // When & Then
-        assertThrows(IllegalArgumentException.class, () -> userService.convertToUserResponse(null));
+        assertTrue(result.isPresent());
+        UserResponse userResponse = result.get();
+        assertNotNull(userResponse.getPreferences());
+        // The preferences object should be empty but not null
     }
 } 
