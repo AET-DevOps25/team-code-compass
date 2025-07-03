@@ -1,10 +1,10 @@
-package com.flexfit.userservice.model;
+package com.flexfit.userservice.models;
 
-import com.flexfit.userservice.model.enums.EquipmentItem;
-import com.flexfit.userservice.model.enums.ExperienceLevel;
-import com.flexfit.userservice.model.enums.FitnessGoal;
-import com.flexfit.userservice.model.enums.IntensityPreference;
-import com.flexfit.userservice.model.enums.SportType;
+import com.flexfit.userservice.models.enums.EquipmentItem;
+import com.flexfit.userservice.models.enums.ExperienceLevel;
+import com.flexfit.userservice.models.enums.FitnessGoal;
+import com.flexfit.userservice.models.enums.IntensityPreference;
+import com.flexfit.userservice.models.enums.SportType;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;

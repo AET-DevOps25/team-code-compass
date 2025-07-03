@@ -1,6 +1,6 @@
 package com.flexfit.userservice.repository;
 
-import com.flexfit.userservice.model.UserPreferences;
+import com.flexfit.userservice.models.UserPreferences;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

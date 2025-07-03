@@ -1,6 +1,6 @@
 package com.flexfit.userservice.repository;
 
-import com.flexfit.userservice.model.User;
+import com.flexfit.userservice.models.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
