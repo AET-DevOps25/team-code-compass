@@ -21,6 +21,8 @@ import java.time.Period;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.Optional;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -116,6 +118,7 @@ public class WorkoutPlanService {
         dailyWorkout.setUserId(request.getUserId());
         dailyWorkout.setDayDate(request.getDayDate());
         dailyWorkout.setFocusSportTypeForTheDay(request.getFocusSportType());
+        dailyWorkout.setMarkdownContent(aiWorkout.markdown_content());
         
         List<ScheduledExercise> exercises = aiWorkout.scheduled_exercises().stream().map(aiExercise -> {
             ScheduledExercise exercise = new ScheduledExercise();
@@ -136,5 +139,17 @@ public class WorkoutPlanService {
         dailyWorkout.setScheduledExercises(exercises);
 
         return dailyWorkoutRepository.save(dailyWorkout);
+    }
+
+    public Optional<DailyWorkoutResponse> getWorkoutByUserAndDate(UUID userId, java.time.LocalDate date) {
+        Optional<DailyWorkout> workout = dailyWorkoutRepository.findByUserIdAndDayDate(userId, date);
+        return workout.map(mapper::toDailyWorkoutResponse);
+    }
+
+    public List<DailyWorkoutResponse> getWorkoutsByUserAndDateRange(UUID userId, java.time.LocalDate startDate, java.time.LocalDate endDate) {
+        List<DailyWorkout> workouts = dailyWorkoutRepository.findByUserIdAndDayDateBetween(userId, startDate, endDate);
+        return workouts.stream()
+                      .map(mapper::toDailyWorkoutResponse)
+                      .collect(Collectors.toList());
     }
 }
