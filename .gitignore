@@ -185,7 +185,8 @@ develop-eggs/
 downloads/
 eggs/
 .eggs/
-lib/
+# Python lib directories (but not TypeScript/JavaScript lib directories)
+/lib/
 lib64/
 parts/
 sdist/
