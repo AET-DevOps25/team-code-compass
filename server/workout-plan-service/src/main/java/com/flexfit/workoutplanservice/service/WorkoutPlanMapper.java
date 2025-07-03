@@ -20,6 +20,7 @@ public class WorkoutPlanMapper {
         dto.setCompletionStatus(dailyWorkout.getCompletionStatus());
         dto.setRpeOverallFeedback(dailyWorkout.getRpeOverallFeedback());
         dto.setCompletionNotes(dailyWorkout.getCompletionNotes());
+        dto.setMarkdownContent(dailyWorkout.getMarkdownContent());
         dto.setScheduledExercises(dailyWorkout.getScheduledExercises().stream()
                 .map(this::toScheduledExerciseResponse)
                 .collect(Collectors.toList()));

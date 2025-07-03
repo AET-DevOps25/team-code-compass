@@ -10,6 +10,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/v1/plans")
@@ -26,6 +30,35 @@ public class WorkoutPlanController {
 
         DailyWorkoutResponse response = workoutPlanService.generateWorkoutPlan(request, bearerToken);
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/user/{userId}/date/{date}")
+    @SecurityRequirement(name = "bearerAuth")
+    public ResponseEntity<DailyWorkoutResponse> getWorkoutByUserAndDate(
+            @PathVariable UUID userId,
+            @PathVariable String date,
+            @RequestHeader("Authorization") String bearerToken) {
+        
+        LocalDate workoutDate = LocalDate.parse(date);
+        Optional<DailyWorkoutResponse> workout = workoutPlanService.getWorkoutByUserAndDate(userId, workoutDate);
+        
+        return workout.map(ResponseEntity::ok)
+                     .orElse(ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/user/{userId}/range")
+    @SecurityRequirement(name = "bearerAuth")
+    public ResponseEntity<List<DailyWorkoutResponse>> getWorkoutsByUserAndDateRange(
+            @PathVariable UUID userId,
+            @RequestParam String startDate,
+            @RequestParam String endDate,
+            @RequestHeader("Authorization") String bearerToken) {
+        
+        LocalDate start = LocalDate.parse(startDate);
+        LocalDate end = LocalDate.parse(endDate);
+        List<DailyWorkoutResponse> workouts = workoutPlanService.getWorkoutsByUserAndDateRange(userId, start, end);
+        
+        return ResponseEntity.ok(workouts);
     }
 
     @GetMapping("/health")

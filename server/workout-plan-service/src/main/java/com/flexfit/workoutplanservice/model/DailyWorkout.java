@@ -41,6 +41,10 @@ public class DailyWorkout {
     @Column(columnDefinition = "TEXT")
     private String completionNotes;
     
+    // Generated markdown content from GenAI for display on frontend
+    @Column(columnDefinition = "TEXT")
+    private String markdownContent;
+    
     @OneToMany(mappedBy = "dailyWorkout", cascade = CascadeType.ALL, fetch = FetchType.EAGER, orphanRemoval = true)
     @OrderBy("sequenceOrder ASC") // Ensures exercises are always ordered correctly
     private List<ScheduledExercise> scheduledExercises;
