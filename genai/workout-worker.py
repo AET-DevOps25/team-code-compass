@@ -35,6 +35,7 @@ class GenAIDailyWorkout(BaseModel):
     day_date: str
     focus_sport_type_for_the_day: str
     scheduled_exercises: List[GenAIExercise]
+    markdown_content: str = ""  # Rich markdown content for frontend display
 
 class GenAIResponse(BaseModel):
     daily_workout: GenAIDailyWorkout
@@ -126,6 +127,8 @@ async def generate_workout(context: PromptContext, authorization: Optional[str] 
         
         # Create mock workout plan based on sport type
         mock_exercises = []
+        markdown_content = ""
+        
         if sport_type == "STRENGTH":
             mock_exercises = [
                 GenAIExercise(
@@ -168,6 +171,208 @@ async def generate_workout(context: PromptContext, authorization: Optional[str] 
                     video_url="https://example.com/plank"
                 )
             ]
+            
+            markdown_content = f"""# Full Body Strength 💪
+
+## Warm-up (5 minutes)
+- **Arm circles**: 1 minute each direction
+- **Leg swings**: 1 minute each leg
+- **Light jogging in place**: 2 minutes
+
+## Main Workout (35 minutes)
+
+### Upper Body Circuit (15 minutes)
+| Exercise | Sets | Reps | Rest |
+|----------|------|------|------|
+| **Push-ups** | 3 | 10-15 | 60s |
+| **Pike Push-ups** | 3 | 8-10 | 60s |
+| **Tricep Dips** | 3 | 8-12 | 90s |
+
+### Lower Body Circuit (15 minutes)
+| Exercise | Sets | Reps | Rest |
+|----------|------|------|------|
+| **Squats** | 3 | 12-20 | 60s |
+| **Lunges** | 3 | 10 each leg | 60s |
+| **Calf Raises** | 3 | 15 | 45s |
+
+### Core Finisher (5 minutes)
+- **Plank**: 3 × 30-60 seconds
+- **Side Plank**: 3 × 20 seconds each side
+- **Dead Bug**: 3 × 10 each side
+
+## Cool Down (5 minutes)
+- Full body stretching routine
+
+---
+**Calories Burned**: ~280 kcal  
+**Difficulty**: ⭐⭐⭐⚪⚪  
+**Status**: 📅 **SCHEDULED**
+
+> 💪 **Focus on proper form over speed. Quality reps build strength!**"""
+
+        elif sport_type == "HIIT":
+            mock_exercises = [
+                GenAIExercise(
+                    sequence_order=1,
+                    exercise_name="Burpees",
+                    description="High-intensity full body exercise",
+                    applicable_sport_types=["HIIT"],
+                    muscle_groups_primary=["full_body"],
+                    muscle_groups_secondary=["cardiovascular"],
+                    equipment_needed=["NO_EQUIPMENT"],
+                    difficulty="Intermediate",
+                    prescribed_sets_reps_duration="4 sets of 45 seconds",
+                    voice_script_cue_text="Jump down to plank, push-up, jump feet to hands, explosive jump up",
+                    video_url="https://example.com/burpees"
+                ),
+                GenAIExercise(
+                    sequence_order=2,
+                    exercise_name="Mountain Climbers",
+                    description="Core and cardio intensive exercise",
+                    applicable_sport_types=["HIIT"],
+                    muscle_groups_primary=["core", "shoulders"],
+                    muscle_groups_secondary=["legs"],
+                    equipment_needed=["NO_EQUIPMENT"],
+                    difficulty="Intermediate",
+                    prescribed_sets_reps_duration="4 sets of 45 seconds",
+                    voice_script_cue_text="Hold plank position, alternate bringing knees to chest rapidly",
+                    video_url="https://example.com/mountain-climbers"
+                ),
+                GenAIExercise(
+                    sequence_order=3,
+                    exercise_name="Jump Squats",
+                    description="Explosive lower body plyometric exercise",
+                    applicable_sport_types=["HIIT"],
+                    muscle_groups_primary=["quadriceps", "glutes"],
+                    muscle_groups_secondary=["calves"],
+                    equipment_needed=["NO_EQUIPMENT"],
+                    difficulty="Intermediate",
+                    prescribed_sets_reps_duration="4 sets of 45 seconds",
+                    voice_script_cue_text="Squat down, explode up into jump, land softly and repeat",
+                    video_url="https://example.com/jump-squats"
+                )
+            ]
+            
+            markdown_content = f"""# HIIT Cardio Blast 🔥
+
+## Overview
+High-intensity interval training to boost cardiovascular fitness and burn calories.
+
+## Warm-up (5 minutes)
+- **Marching in place**: 2 minutes
+- **Arm swings**: 1 minute
+- **Dynamic stretching**: 2 minutes
+
+## HIIT Rounds (20 minutes)
+**4 rounds × 3 exercises × 45s work / 15s rest**
+
+### Round Structure
+| Exercise | Work | Rest | Notes |
+|----------|------|------|-------|
+| **Burpees** | 45s | 15s | Full body explosive |
+| **Mountain Climbers** | 45s | 15s | Keep core tight |
+| **Jump Squats** | 45s | 15s | Land softly |
+
+**90 seconds rest between rounds**
+
+## Cool Down (5 minutes)
+- Walking in place: 2 minutes
+- Static stretches: 3 minutes
+
+---
+**Peak Heart Rate**: 85-95% max HR  
+**Calories Burned**: ~320 kcal  
+**Status**: 📅 **SCHEDULED**
+
+> 🔥 **Push yourself during work intervals, but listen to your body!**"""
+
+        elif sport_type == "YOGA":
+            mock_exercises = [
+                GenAIExercise(
+                    sequence_order=1,
+                    exercise_name="Downward Dog",
+                    description="Foundation yoga pose for strength and flexibility",
+                    applicable_sport_types=["YOGA"],
+                    muscle_groups_primary=["shoulders", "hamstrings"],
+                    muscle_groups_secondary=["calves", "core"],
+                    equipment_needed=["YOGA_MAT"],
+                    difficulty="Beginner",
+                    prescribed_sets_reps_duration="Hold for 1-2 minutes",
+                    voice_script_cue_text="Hands shoulder-width apart, lift hips up and back, straight line from hands to hips",
+                    video_url="https://example.com/downward-dog"
+                ),
+                GenAIExercise(
+                    sequence_order=2,
+                    exercise_name="Warrior I",
+                    description="Standing pose for strength and balance",
+                    applicable_sport_types=["YOGA"],
+                    muscle_groups_primary=["legs", "core"],
+                    muscle_groups_secondary=["arms"],
+                    equipment_needed=["YOGA_MAT"],
+                    difficulty="Beginner",
+                    prescribed_sets_reps_duration="Hold 30 seconds each side",
+                    voice_script_cue_text="Step back into lunge, lift arms overhead, square hips forward",
+                    video_url="https://example.com/warrior-1"
+                ),
+                GenAIExercise(
+                    sequence_order=3,
+                    exercise_name="Child's Pose",
+                    description="Restorative pose for relaxation and recovery",
+                    applicable_sport_types=["YOGA"],
+                    muscle_groups_primary=["back", "hips"],
+                    muscle_groups_secondary=["shoulders"],
+                    equipment_needed=["YOGA_MAT"],
+                    difficulty="Beginner",
+                    prescribed_sets_reps_duration="Hold for 1-3 minutes",
+                    voice_script_cue_text="Kneel on mat, sit back on heels, fold forward with arms extended",
+                    video_url="https://example.com/childs-pose"
+                )
+            ]
+            
+            markdown_content = f"""# Mindful Yoga Flow 🧘‍♀️
+
+## Purpose
+Gentle movement to promote flexibility, balance, and mindfulness.
+
+## Centering (5 minutes)
+- **Seated meditation**: 3 minutes
+- **Breath awareness**: 2 minutes
+
+## Yoga Flow (40 minutes)
+
+### Sun Salutation Warm-up (10 minutes)
+- **Mountain Pose**: 1 minute
+- **Forward Fold**: 1 minute
+- **Half Lift**: 1 minute
+- **Low Lunge**: 2 minutes each side
+- **Downward Dog**: 3 minutes
+
+### Standing Sequence (15 minutes)
+| Pose | Duration | Focus |
+|------|----------|-------|
+| **Warrior I** | 1 min each side | Strength & Balance |
+| **Warrior II** | 1 min each side | Hip Opening |
+| **Triangle Pose** | 1 min each side | Side Body Stretch |
+| **Tree Pose** | 1 min each side | Balance |
+
+### Floor Sequence (15 minutes)
+- **Seated Forward Fold**: 3 minutes
+- **Spinal Twist**: 2 minutes each side
+- **Bridge Pose**: 3 minutes
+- **Happy Baby**: 2 minutes
+- **Savasana**: 3 minutes
+
+## Closing (5 minutes)
+- **Child's Pose**: 3 minutes
+- **Gratitude meditation**: 2 minutes
+
+---
+**Intensity**: Gentle  
+**Benefits**: Flexibility, balance, stress relief  
+**Status**: 📅 **SCHEDULED**
+
+> 🌱 **Move with your breath and honor your body's limits today.**"""
+
         else:
             # Default exercises for other sport types
             mock_exercises = [
@@ -185,11 +390,30 @@ async def generate_workout(context: PromptContext, authorization: Optional[str] 
                     video_url="https://example.com/jumping-jacks"
                 )
             ]
+            
+            markdown_content = f"""# {sport_type.title()} Workout 💪
+
+## Warm-up (5 minutes)
+- **Light movement**: 3 minutes
+- **Dynamic stretches**: 2 minutes
+
+## Main Workout (25 minutes)
+- **Jumping Jacks**: 3 sets of 30 seconds
+- **Rest**: 30 seconds between sets
+
+## Cool Down (5 minutes)
+- **Walking**: 2 minutes
+- **Static stretches**: 3 minutes
+
+---
+**Status**: 📅 **SCHEDULED**
+"""
         
         mock_workout = GenAIDailyWorkout(
             day_date=day_date,
             focus_sport_type_for_the_day=sport_type,
-            scheduled_exercises=mock_exercises
+            scheduled_exercises=mock_exercises,
+            markdown_content=markdown_content
         )
         
         response = GenAIResponse(daily_workout=mock_workout)

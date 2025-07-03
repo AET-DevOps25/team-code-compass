@@ -24,7 +24,7 @@ RUN ./mvnw dependency:go-offline -B
 COPY src ./src
 
 # Build the application and package it into a JAR file, skipping tests.
-RUN ./mvnw clean package -DskipTests
+RUN ./mvnw clean package -Dmaven.test.skip=true
 
 
 # --- Run Stage ---

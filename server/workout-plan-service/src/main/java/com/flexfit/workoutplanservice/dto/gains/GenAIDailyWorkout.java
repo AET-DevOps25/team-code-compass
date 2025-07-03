@@ -7,5 +7,6 @@ import java.util.List;
 public record GenAIDailyWorkout(
     String day_date, 
     String focus_sport_type_for_the_day, 
-    List<GenAIExercise> scheduled_exercises
+    List<GenAIExercise> scheduled_exercises,
+    String markdown_content
 ) {} 
