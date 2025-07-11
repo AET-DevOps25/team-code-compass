@@ -2,7 +2,7 @@ name: 🚀 FlexFit CI/CD Pipeline
 
 on:
   push:
-    branches: [ main, development ]
+    branches: [ main, development, 'feature/*' ]
   pull_request:
     branches: [ main, development ]
   workflow_dispatch:
@@ -20,7 +20,7 @@ on:
           - full
 
 env:
-  JAVA_VERSION: '17'
+  JAVA_VERSION: '21'
   PYTHON_VERSION: '3.9'
 
 jobs:
@@ -44,6 +44,14 @@ jobs:
           echo "Branch: ${{ github.ref_name }}"
           echo "Target: ${{ github.base_ref || 'N/A' }}"
           echo "Actor: ${{ github.actor }}"
+          echo ""
+          if [[ "${{ github.ref }}" == refs/heads/feature/* ]]; then
+            echo "🌿 Feature Branch - Running unit + integration tests only"
+          elif [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "🔄 Pull Request - Running validation tests"
+          else
+            echo "🎯 Main/Development - Running full pipeline"
+          fi
 
       - name: 🎯 Decide what to run
         id: decide
@@ -77,6 +85,12 @@ jobs:
           # PR - run unit + integration only
           if [ "${{ github.event_name }}" == "pull_request" ]; then
             SYSTEM="false"
+          fi
+          
+          # Feature branches - run unit + integration only (no system tests)
+          if [[ "${{ github.ref }}" == refs/heads/feature/* ]]; then
+            SYSTEM="false"
+            echo "🌿 Feature branch detected - running unit + integration tests only"
           fi
           
           echo "should_run_unit=$UNIT" >> $GITHUB_OUTPUT
@@ -117,9 +131,8 @@ jobs:
       - name: 🧪 Run Java Unit Tests
         run: |
           echo "🧪 Running Java unit tests..."
-          cd server/user-service && ./mvnw test -q
-          cd ../workout-plan-service && ./mvnw test -q
-          echo "✅ Java unit tests completed"
+          chmod +x run-ci-tests.sh
+          ./run-ci-tests.sh
 
       - name: 🧪 Run Python Unit Tests
         continue-on-error: true

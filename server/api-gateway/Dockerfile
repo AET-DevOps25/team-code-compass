@@ -38,5 +38,5 @@ EXPOSE 8000
 # Set JVM options for optimized performance in a containerized environment.
 ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=70.0"
 
-# The command to run the application when the container starts.
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"] 
+# Add startup delay to allow services to register with Eureka before gateway starts
+ENTRYPOINT ["sh", "-c", "echo 'Waiting for services to register...' && sleep 45 && echo 'Starting API Gateway...' && java $JAVA_OPTS -jar app.jar"] 
