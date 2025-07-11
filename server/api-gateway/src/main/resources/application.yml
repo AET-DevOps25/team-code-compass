@@ -39,6 +39,14 @@ spring:
           filters:
             - StripPrefix=1
 
+        # Workout plan service routes via service discovery path
+        - id: workout-plan-service-discovery
+          uri: lb://workout-plan-service
+          predicates:
+            - Path=/workout-plan-service/api/v1/plans/**
+          filters:
+            - RewritePath=/workout-plan-service/(?<segment>.*), /${segment}
+
         # Swagger UI routes for easy access via gateway
         - id: user-service-docs
           uri: lb://user-service
