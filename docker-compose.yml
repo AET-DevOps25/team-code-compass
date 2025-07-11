@@ -7,7 +7,7 @@ services:
     container_name: flexfit-client
     restart: always
     ports:
-      - "3000:80"
+      - "3001:80"
     networks:
       - flexfit-network
     healthcheck:
@@ -17,7 +17,7 @@ services:
       retries: 3
       start_period: 30s
 
-  # Service Registry (Eureka Server)
+  # Service Registry (Eureka Server) - Must start first
   service-registry:
     build:
       context: ./server/service-registry
@@ -37,47 +37,18 @@ services:
       retries: 5
       start_period: 60s
 
-  # API Gateway
-  api-gateway:
-    build:
-      context: ./server/api-gateway
-      dockerfile: Dockerfile
-    container_name: flexfit-api-gateway
-    restart: always
-    ports:
-      - "8000:8000"
-    environment:
-      SPRING_PROFILES_ACTIVE: docker
-      EUREKA_SERVER: http://service-registry:8761/eureka
-    depends_on:
-      service-registry:
-        condition: service_healthy
-    networks:
-      - flexfit-network
-    healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8000/actuator/health || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-
+  # PostgreSQL Database - Independent service
   postgres:
     image: postgres:16
     container_name: flexfit-postgres
     restart: always
     environment:
-      # These environment variables are used to initialize the PostgreSQL database.
-      # The values are loaded from the .env file for security and flexibility.
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
     ports:
-      # Maps the container's port 5432 to the host's port 5432.
-      # This allows external connections to the database if needed.
       - "5432:5432"
     volumes:
-      # Persists the database data on the host machine, so you don't lose data
-      # when the container is stopped or removed.
       - postgres-data:/var/lib/postgresql/data
     networks:
       - flexfit-network
@@ -87,6 +58,7 @@ services:
       timeout: 5s
       retries: 5
 
+  # User Service - Business service that registers with Eureka
   user-service:
     build:
       context: ./server/user-service
@@ -94,17 +66,13 @@ services:
     container_name: flexfit-user-service
     restart: always
     environment:
-      # Database connection settings
       DB_HOST: postgres
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
-      # Spring profiles
       SPRING_PROFILES_ACTIVE: docker
-      # Eureka configuration
       EUREKA_SERVER: http://service-registry:8761/eureka
     ports:
-      # Maps the container's port 8081 to the host's port 8081
       - "8081:8081"
     depends_on:
       postgres:
@@ -120,7 +88,7 @@ services:
       retries: 3
       start_period: 40s
 
-      # This section defines the new service for managing workout plans.
+  # Workout Plan Service - Business service that registers with Eureka
   workout-plan-service:
     build:
       context: ./server/workout-plan-service 
@@ -133,30 +101,27 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
       SPRING_PROFILES_ACTIVE: docker
-      # Eureka configuration
       EUREKA_SERVER: http://service-registry:8761/eureka
     ports:
-      # Exposing this service on port 8082
       - "8082:8082"
     depends_on:
       postgres:
-        condition: service_healthy # Ensures the database is ready before starting
+        condition: service_healthy
       service-registry:
         condition: service_healthy
     networks:
       - flexfit-network
     healthcheck:
-      # Checks if the service's actuator health endpoint is responsive.
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8082/actuator/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s # Gives the service extra time to start up initially
+      start_period: 40s
 
-  # GenAI Workout Worker
+  # GenAI Workout Worker - Independent service
   genai-workout-worker:
     build:
-      context: ./genai # Correct path to genai directory
+      context: ./genai
       dockerfile: Dockerfile
     container_name: flexfit-genai-workout-worker
     restart: always
@@ -174,11 +139,37 @@ services:
       retries: 3
       start_period: 30s
 
+  # API Gateway - Now has internal startup delay
+  api-gateway:
+    build:
+      context: ./server/api-gateway
+      dockerfile: Dockerfile
+    container_name: flexfit-api-gateway
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      EUREKA_SERVER: http://service-registry:8761/eureka
+      # Configure gateway for better service discovery
+      JAVA_OPTS: "-Dspring.cloud.gateway.discovery.locator.enabled=true -Dspring.cloud.gateway.discovery.locator.lower-case-service-id=true -Deureka.client.registry-fetch-interval-seconds=5"
+    depends_on:
+      service-registry:
+        condition: service_healthy
+      # Removed business service dependencies - gateway waits internally
+    networks:
+      - flexfit-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8000/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
 # Defines the shared network for all services
 networks:
   flexfit-network:
     driver: bridge
 
 volumes:
-  # Defines the named volume for data persistence.
   postgres-data:

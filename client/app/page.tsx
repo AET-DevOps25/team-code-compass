@@ -34,6 +34,8 @@ import {
   Moon,
 } from "lucide-react"
 import ReactMarkdown from "react-markdown"
+import { useAuth } from "../src/hooks/useAuth"
+import { Gender } from "../src/types/user"
 
 // Types and Enums
 enum FitnessGoal {
@@ -143,7 +145,7 @@ interface ChatMessage {
 }
 
 export default function FlexFitApp() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const { user, isAuthenticated, isLoading, logout } = useAuth()
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date())
   const [currentWorkout, setCurrentWorkout] = useState<WorkoutSession | null>(null)
@@ -786,56 +788,308 @@ Comprehensive leg and glute workout for strength and power.
     setChatInput("")
   }
 
-  const AuthDialog = ({ type }: { type: "login" | "register" }) => (
-    <DialogContent className="sm:max-w-md">
-      <DialogHeader>
-        <DialogTitle className="text-center">{type === "login" ? "Welcome Back" : "Join FlexFit"}</DialogTitle>
-      </DialogHeader>
-      <div className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
-          <Input id="email" type="email" placeholder="your@email.com" />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="password">Password</Label>
-          <Input id="password" type="password" />
-        </div>
-        {type === "register" && (
-          <div className="space-y-2">
-            <Label htmlFor="name">Full Name</Label>
-            <Input id="name" placeholder="Your Name" />
+  const AuthDialog = ({ type }: { type: "login" | "register" }) => {
+    const { login, register } = useAuth()
+    const [formData, setFormData] = useState({
+      email: '',
+      password: '',
+      username: '',
+      dateOfBirth: '',
+      gender: Gender.MALE,
+      heightCm: 0,
+      weightKg: 0
+    })
+    const [isSubmitting, setIsSubmitting] = useState(false)
+    const [error, setError] = useState<string | null>(null)
+    const [detailedError, setDetailedError] = useState<any>(null)
+    const [dialogOpen, setDialogOpen] = useState(false)
+
+    const handleSubmit = async () => {
+      console.group(`🚀 ${type === 'login' ? 'Login' : 'Registration'} Form Submission`);
+      console.log('📋 Form data:', {
+        email: formData.email,
+        username: formData.username,
+        passwordLength: formData.password.length,
+        dateOfBirth: formData.dateOfBirth,
+        gender: formData.gender,
+        heightCm: formData.heightCm,
+        weightKg: formData.weightKg
+      });
+      
+      setIsSubmitting(true)
+      setError(null)
+      setDetailedError(null)
+
+      try {
+        if (type === "login") {
+          console.log('🔑 Attempting login...');
+          const result = await login({
+            email: formData.email,
+            password: formData.password
+          })
+          
+          console.log('📥 Login result:', result);
+          
+          if (result.success) {
+            console.log('✅ Login successful! Closing dialog...');
+            setDialogOpen(false)
+            setFormData({
+              email: '',
+              password: '',
+              username: '',
+              dateOfBirth: '',
+              gender: Gender.MALE,
+              heightCm: 0,
+              weightKg: 0
+            })
+          } else {
+            console.error('❌ Login failed:', result.error);
+            setError(result.error || 'Login failed')
+            setDetailedError(result)
+          }
+        } else {
+          console.log('📝 Attempting registration...');
+          const result = await register({
+            email: formData.email,
+            password: formData.password,
+            username: formData.username,
+            dateOfBirth: formData.dateOfBirth,
+            gender: formData.gender,
+            heightCm: formData.heightCm || undefined,
+            weightKg: formData.weightKg || undefined
+          })
+          
+          console.log('📥 Registration result:', result);
+          
+          if (result.success) {
+            console.log('🎉 Registration successful! Closing dialog...');
+            setDialogOpen(false)
+            setFormData({
+              email: '',
+              password: '',
+              username: '',
+              dateOfBirth: '',
+              gender: Gender.MALE,
+              heightCm: 0,
+              weightKg: 0
+            })
+          } else {
+            console.error('❌ Registration failed:', result.error);
+            setError(result.error || 'Registration failed')
+            setDetailedError(result)
+          }
+        }
+      } catch (err) {
+        console.error('💥 Unexpected error during submission:', err);
+        const errorMsg = 'An unexpected error occurred';
+        setError(errorMsg)
+        setDetailedError({ error: errorMsg, exception: err })
+      } finally {
+        setIsSubmitting(false)
+        console.groupEnd();
+      }
+    }
+
+    const handleInputChange = (field: string, value: string | number) => {
+      setFormData(prev => ({
+        ...prev,
+        [field]: value
+      }))
+    }
+
+    return (
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogTrigger asChild>
+          <Button 
+            variant={type === "login" ? "outline" : "default"}
+            className={type === "login" ? "bg-white/80 backdrop-blur-sm" : "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"}
+          >
+            {type === "login" ? "Login" : "Register"}
+          </Button>
+        </DialogTrigger>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-center">{type === "login" ? "Welcome Back" : "Join FlexFit"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {error && (
+              <div className="space-y-2">
+                <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-md text-sm">
+                  <div className="font-medium">❌ Error:</div>
+                  <div>{error}</div>
+                </div>
+                
+                {/* Developer info - only show in development */}
+                {process.env.NODE_ENV === 'development' && detailedError && (
+                  <details className="bg-gray-50 border border-gray-200 p-3 rounded-md text-xs">
+                    <summary className="cursor-pointer font-medium text-gray-600">
+                      🔍 Debug Information (Development Only)
+                    </summary>
+                    <div className="mt-2 space-y-1">
+                      <div><strong>Full Error:</strong> {JSON.stringify(detailedError, null, 2)}</div>
+                      <div><strong>Timestamp:</strong> {new Date().toISOString()}</div>
+                      <div><strong>User Agent:</strong> {navigator.userAgent}</div>
+                      <div><strong>Current URL:</strong> {window.location.href}</div>
+                    </div>
+                  </details>
+                )}
+                
+                {/* Helpful tips based on error type */}
+                {error?.includes('CORS') && (
+                  <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-3 py-2 rounded-md text-sm">
+                    <div className="font-medium">💡 Troubleshooting Tips:</div>
+                    <ul className="mt-1 list-disc list-inside space-y-1 text-xs">
+                      <li>Check if the backend server is running on port 8000</li>
+                      <li>Verify CORS is properly configured on the server</li>
+                      <li>Try refreshing the page and trying again</li>
+                    </ul>
+                  </div>
+                )}
+                
+                {error?.includes('Network error') && (
+                  <div className="bg-blue-50 border border-blue-200 text-blue-800 px-3 py-2 rounded-md text-sm">
+                    <div className="font-medium">🌐 Network Issues:</div>
+                    <ul className="mt-1 list-disc list-inside space-y-1 text-xs">
+                      <li>Check your internet connection</li>
+                      <li>Verify the backend server is running</li>
+                      <li>Try again in a few moments</li>
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input 
+                id="email" 
+                type="email" 
+                placeholder="your@email.com"
+                value={formData.email}
+                onChange={(e) => handleInputChange('email', e.target.value)}
+                disabled={isSubmitting}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input 
+                id="password" 
+                type="password"
+                value={formData.password}
+                onChange={(e) => handleInputChange('password', e.target.value)}
+                disabled={isSubmitting}
+              />
+            </div>
+            
+            {type === "register" && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="username">Username</Label>
+                  <Input 
+                    id="username" 
+                    placeholder="Your Username"
+                    value={formData.username}
+                    onChange={(e) => handleInputChange('username', e.target.value)}
+                    disabled={isSubmitting}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="dateOfBirth">Date of Birth</Label>
+                  <Input 
+                    id="dateOfBirth" 
+                    type="date"
+                    value={formData.dateOfBirth}
+                    onChange={(e) => handleInputChange('dateOfBirth', e.target.value)}
+                    disabled={isSubmitting}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="gender">Gender</Label>
+                  <Select 
+                    value={formData.gender} 
+                    onValueChange={(value) => handleInputChange('gender', value)}
+                    disabled={isSubmitting}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select gender" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={Gender.MALE}>Male</SelectItem>
+                      <SelectItem value={Gender.FEMALE}>Female</SelectItem>
+                      <SelectItem value={Gender.OTHER}>Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="heightCm">Height (cm)</Label>
+                    <Input 
+                      id="heightCm" 
+                      type="number"
+                      placeholder="170"
+                      value={formData.heightCm || ''}
+                      onChange={(e) => handleInputChange('heightCm', parseInt(e.target.value) || 0)}
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="weightKg">Weight (kg)</Label>
+                    <Input 
+                      id="weightKg" 
+                      type="number"
+                      placeholder="70"
+                      value={formData.weightKg || ''}
+                      onChange={(e) => handleInputChange('weightKg', parseFloat(e.target.value) || 0)}
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+            
+            <Button
+              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <>Loading...</>
+              ) : (
+                type === "login" ? "Sign In" : "Create Account"
+              )}
+            </Button>
           </div>
-        )}
-        <Button
-          className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-          onClick={() => setIsAuthenticated(true)}
-        >
-          {type === "login" ? "Sign In" : "Create Account"}
-        </Button>
+        </DialogContent>
+      </Dialog>
+    )
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="flex items-center justify-center space-x-2">
+            <Dumbbell className="h-8 w-8 text-blue-600 animate-pulse" />
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              FlexFit
+            </h1>
+          </div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
       </div>
-    </DialogContent>
-  )
+    )
+  }
 
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
         <div className="absolute top-4 left-4 flex gap-2">
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button variant="outline" className="bg-white/80 backdrop-blur-sm">
-                Login
-              </Button>
-            </DialogTrigger>
-            <AuthDialog type="login" />
-          </Dialog>
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
-                Register
-              </Button>
-            </DialogTrigger>
-            <AuthDialog type="register" />
-          </Dialog>
+          <AuthDialog type="login" />
+          <AuthDialog type="register" />
         </div>
 
         <div className="flex items-center justify-center min-h-screen">
@@ -900,9 +1154,15 @@ Comprehensive leg and glute workout for strength and power.
               <div className="flex items-center space-x-4">
                 <Avatar>
                   <AvatarImage src="/placeholder.svg?height=32&width=32" />
-                  <AvatarFallback>U</AvatarFallback>
+                  <AvatarFallback>
+                    {user?.username?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || 'U'}
+                  </AvatarFallback>
                 </Avatar>
-                <Button variant="outline" onClick={() => setIsAuthenticated(false)} className="bg-white/80">
+                <div className="hidden md:block">
+                  <p className="text-sm font-medium">{user?.username || 'User'}</p>
+                  <p className="text-xs text-gray-600">{user?.email}</p>
+                </div>
+                <Button variant="outline" onClick={logout} className="bg-white/80">
                   Logout
                 </Button>
               </div>
