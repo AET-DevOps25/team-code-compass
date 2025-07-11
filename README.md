@@ -8,7 +8,7 @@ The FlexFit platform follows a **Master-Worker microservices pattern** with **Se
 
 ### Core Infrastructure Services:
 - **Service Registry (Eureka Server)**: Service discovery and health monitoring
-- **API Gateway**: Single entry point, request routing, and load balancing
+- **API Gateway**: Single entry point, request routing, load balancing, and **centralized CORS handling**
 - **PostgreSQL Database**: Centralized data storage for all services
 
 ### Business Logic Services:
@@ -57,6 +57,9 @@ CHAIR_API_KEY=your_chair_api_key_here
 # -d flag runs in background (detached mode)
 docker compose up --build -d
 
+# API Gateway will automatically wait for services to register
+# No manual restart needed!
+
 # View logs for all services (live stream)
 docker compose logs -f
 
@@ -71,13 +74,28 @@ docker compose logs -f genai-workout-worker  # AI Worker
 docker compose down
 ```
 
+## 🌐 CORS Configuration
+
+**✅ CORS is centrally managed at the API Gateway level** - this ensures consistent cross-origin handling across all microservices:
+
+- **Frontend Origin**: All requests from `http://localhost:3001` (or any origin) are automatically allowed
+- **No Duplicate Headers**: Backend services have CORS disabled to prevent conflicts
+- **Global Policy**: API Gateway handles all CORS preflight and actual requests
+- **Development Friendly**: Configured to allow all origins with `allowedOriginPatterns("*")`
+
+### Supported Routes:
+- ✅ Direct routes: `http://localhost:8000/api/v1/users/**`
+- ✅ Service discovery routes: `http://localhost:8000/user-service/api/v1/users/**`
+- ✅ All HTTP methods: GET, POST, PUT, DELETE, OPTIONS, HEAD, PATCH
+- ✅ All headers allowed for development
+
 ## 🐳 Docker Services
 
 ### Service Overview
 | Service | Port | Status | Description |
 |---------|------|--------|-------------|
 | **Service Registry** | `8761` | ✅ Healthy | Eureka Server - Service discovery |
-| **API Gateway** | `8000` | ✅ Healthy | Spring Cloud Gateway - Request routing |
+| **API Gateway** | `8000` | ✅ Healthy | Spring Cloud Gateway - Request routing + CORS |
 | **PostgreSQL** | `5432` | ✅ Healthy | Database server |
 | **User Service** | `8081` | ✅ Healthy | User management API |
 | **Workout Plan Service** | `8082` | ✅ Running | Workout planning API |
@@ -85,7 +103,7 @@ docker compose down
 
 ### Container Details
 - **Service Registry**: Spring Boot 3.5.0 with Netflix Eureka Server
-- **API Gateway**: Spring Boot 3.5.0 with Spring Cloud Gateway
+- **API Gateway**: Spring Boot 3.5.0 with Spring Cloud Gateway + **Reactive CORS Filter**
 - **Database**: `postgres:16` with persistent storage and health checks
 - **User Service**: Spring Boot 3.5.0 with Eclipse Temurin JDK 21 + Eureka Client
 - **Workout Plan Service**: Spring Boot 3.5.0 with Eclipse Temurin JDK 21 + Eureka Client
@@ -98,6 +116,9 @@ docker compose down
 ```bash
 # Rebuild and start all services
 docker compose up --build -d
+
+# Fix service discovery timing issues
+sleep 30 && docker compose restart api-gateway
 
 # View running containers
 docker compose ps
@@ -124,10 +145,11 @@ docker compose restart workout-plan-service
 - **Registered Services**: http://localhost:8761/eureka/apps
 - **Health Check**: http://localhost:8761/actuator/health
 
-#### API Gateway (Port 8000) - **Single Entry Point**
+#### API Gateway (Port 8000) - **Single Entry Point** + **CORS Handler**
 - **Health Check**: http://localhost:8000/actuator/health
 - **Gateway Routes**: http://localhost:8000/actuator/gateway/routes
-- **User Service via Gateway**: http://localhost:8000/api/users/**
+- **User Service via Gateway**: http://localhost:8000/api/v1/users/**
+- **User Service (Discovery)**: http://localhost:8000/user-service/api/v1/users/**
 - **Workout Service via Gateway**: http://localhost:8000/api/workout-plans/**
 
 #### User Service (Port 8081) - **Direct Access**
@@ -173,18 +195,33 @@ docker compose restart workout-plan-service
 
 ### 📝 Example API Calls
 
-#### Register User
+#### Register User (with CORS)
 ```bash
-curl -X POST http://localhost:8081/api/v1/users/register \
+# Via API Gateway (recommended - includes CORS)
+curl -X POST http://localhost:8000/user-service/api/v1/users/register \
   -H "Content-Type: application/json" \
+  -H "Origin: http://localhost:3001" \
   -d '{
     "username": "johndoe",
     "email": "john@example.com",
     "password": "securePassword123",
+    "firstName": "John",
+    "lastName": "Doe",
     "dateOfBirth": "1990-01-15",
-    "gender": "MALE",
-    "heightCm": 180,
-    "weightKg": 75.0
+    "gender": "MALE"
+  }'
+
+# Direct access (no CORS headers)
+curl -X POST http://localhost:8081/api/v1/users/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "johndoe",
+    "email": "john@example.com", 
+    "password": "securePassword123",
+    "firstName": "John",
+    "lastName": "Doe",
+    "dateOfBirth": "1990-01-15",
+    "gender": "MALE"
   }'
 ```
 
@@ -273,7 +310,7 @@ team-code-compass/
 ### Service Communication
 Services communicate through the `flexfit-network` Docker network with **Service Discovery**:
 - **Service Registry (Eureka)**: `service-registry:8761` - Central service discovery
-- **API Gateway**: `api-gateway:8000` - Routes to registered services  
+- **API Gateway**: `api-gateway:8000` - Routes to registered services + **CORS handling**
 - **User Service → Database**: `postgres:5432`
 - **Workout Plan Service → Database**: `postgres:5432`
 - **Workout Plan Service → GenAI Worker**: `flexfit-genai-workout-worker:8083`
@@ -287,8 +324,28 @@ Services communicate through the `flexfit-network` Docker network with **Service
 2. **Database connection**: Verify `.env` file exists and has correct credentials
 3. **Container startup**: Check logs with `docker compose logs <service-name>`
 4. **Missing API key**: Ensure `CHAIR_API_KEY` is set in `.env` file
-5. **Service registration**: Services may take 30-60s to register with Eureka after startup
+5. **Service registration timing**: Services may take 30-60s to register with Eureka after startup
 6. **Command not found**: Use `docker compose` (not `docker-compose`) - V2 syntax
+7. **CORS errors**: Use API Gateway routes instead of direct service access for frontend
+8. **API Gateway startup**: Gateway automatically waits 45s for service registration - no manual intervention needed
+
+### ⚡ Service Discovery Timing Issue Fix
+
+**Problem**: API Gateway returns `503 Service Unavailable` because services haven't registered with Eureka yet.
+
+**Solution**: API Gateway now has an **internal startup delay** - it automatically waits 45 seconds before starting, allowing all services to register with Eureka.
+
+```bash
+# Simply start everything - no manual steps needed
+docker compose up --build -d
+
+# That's it! API Gateway waits internally for service registration
+```
+
+**If you still see 503 errors:**
+1. Check if all services are healthy: `docker compose ps`  
+2. Check Eureka dashboard: http://localhost:8761
+3. Check API Gateway logs: `docker compose logs api-gateway`
 
 ### Service Status Check
 ```bash
@@ -320,6 +377,24 @@ docker compose logs --tail=50 api-gateway
 docker compose logs --tail=50 user-service
 docker compose logs --tail=50 workout-plan-service
 docker compose logs --tail=50 genai-workout-worker
+
+# Check for CORS issues in API Gateway logs
+docker compose logs api-gateway | grep -i cors
+```
+
+### CORS Troubleshooting
+```bash
+# Test CORS preflight request
+curl -v -X OPTIONS "http://localhost:8000/user-service/api/v1/users/register" \
+  -H "Origin: http://localhost:3001" \
+  -H "Access-Control-Request-Method: POST" \
+  -H "Access-Control-Request-Headers: Content-Type"
+
+# Should return:
+# Access-Control-Allow-Origin: http://localhost:3001
+# Access-Control-Allow-Methods: GET,POST,PUT,DELETE,OPTIONS,HEAD,PATCH
+# Access-Control-Allow-Headers: Content-Type
+# Access-Control-Max-Age: 3600
 ```
 
 ### Build Issues Resolution
@@ -329,6 +404,9 @@ If you encounter build issues:
 docker compose down
 docker system prune -f
 docker compose up --build -d
+
+# API Gateway will automatically handle timing
+# No manual restart needed!
 
 # Check for compilation errors
 docker compose logs workout-plan-service | grep ERROR
@@ -346,6 +424,8 @@ docker compose logs workout-plan-service | grep ERROR
 - **Health Monitoring**: Comprehensive health checks
 - **Security**: Development-mode security configuration
 - **Multi-stage Builds**: Optimized Docker images
+- **✅ CORS Support**: Centralized cross-origin handling at API Gateway
+- **✅ Service Discovery**: Automatic service registration and discovery
 
 ### 🔧 Technical Stack
 - **Backend**: Spring Boot 3.5.0, Java 21
@@ -354,6 +434,8 @@ docker compose logs workout-plan-service | grep ERROR
 - **Containerization**: Docker & Docker Compose
 - **Documentation**: OpenAPI 3.0, Swagger UI
 - **Build Tools**: Maven, pip
+- **Service Discovery**: Netflix Eureka
+- **API Gateway**: Spring Cloud Gateway
 
 ## 🚧 Future Enhancements
 
@@ -366,13 +448,15 @@ docker compose logs workout-plan-service | grep ERROR
 - [ ] CI/CD pipeline integration
 - [ ] Kubernetes deployment manifests
 - [ ] Monitoring and logging with ELK stack
+- [x] ✅ **CORS configuration** (completed)
+- [x] ✅ **Service discovery timing fix** (documented)
 
 ## 🎯 Getting Started Checklist
 
 1. ✅ Clone the repository
 2. ✅ Create `.env` file with required variables
 3. ✅ Run `docker compose up --build -d` (note: `--build` flag and `-d` for background)
-4. ✅ Wait for services to start (30-60 seconds for full registration)
+4. ✅ **Wait ~60 seconds** for all services to start and register automatically
 5. ✅ Verify all services are healthy: `docker compose ps`
 6. ✅ Check Service Registry: http://localhost:8761 (view registered services)
 7. ✅ Test API Gateway: http://localhost:8000/actuator/health
@@ -380,9 +464,17 @@ docker compose logs workout-plan-service | grep ERROR
    - User Service: http://localhost:8081/swagger-ui/index.html
    - Workout Plan Service: http://localhost:8082/swagger-ui/index.html
 9. ✅ Test GenAI Worker: http://localhost:8083/health
-10. ✅ Test API Gateway routing:
-    - `curl http://localhost:8000/api/users/health`
-    - `curl http://localhost:8000/api/workout-plans/health`
+10. ✅ **Test CORS-enabled routes** (for frontend):
+    - `curl -H "Origin: http://localhost:3001" http://localhost:8000/user-service/api/v1/users/register`
+    - `curl -H "Origin: http://localhost:3001" http://localhost:8000/api/v1/users/register`
+
+### 🌟 Frontend Integration Ready!
+Your frontend at `http://localhost:3001` can now make requests to:
+- ✅ `http://localhost:8000/user-service/api/v1/users/register`
+- ✅ `http://localhost:8000/api/v1/users/**`
+- ✅ All CORS preflight and actual requests supported
+- ✅ No duplicate CORS headers
+- ✅ Single, clean CORS policy managed at API Gateway
 
 ---
 
