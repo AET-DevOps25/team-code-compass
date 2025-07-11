@@ -774,18 +774,49 @@ Comprehensive leg and glute workout for strength and power.
 
     setChatMessages((prev) => [...prev, userMessage])
 
-    // Simulate AI response
+    // Generate contextual AI response based on user input
     setTimeout(() => {
+      const input = chatInput.toLowerCase()
+      let responseContent = ""
+
+      if (input.includes("workout") || input.includes("exercise")) {
+        responseContent = `Here are some workout suggestions based on your ${userPreferences.fitnessGoal} goal and ${userPreferences.experienceLevel} level:\n\n• ${getWorkoutSuggestion()}\n• Try the calendar above to schedule your workouts\n• I can help you adjust intensity or duration if needed!`
+      } else if (input.includes("diet") || input.includes("nutrition") || input.includes("food")) {
+        responseContent = `For your ${userPreferences.fitnessGoal} goal, here are some nutrition tips:\n\n• Focus on balanced meals with protein, carbs, and healthy fats\n• Stay hydrated throughout the day\n• Consider your ${userPreferences.dietaryPreference} preferences\n\nWould you like specific meal suggestions?`
+      } else if (input.includes("help") || input.includes("?")) {
+        responseContent = `I'm here to help with your fitness journey! I can assist with:\n\n• 💪 Workout planning and suggestions\n• 📅 Scheduling your fitness routine\n• 🥗 Basic nutrition guidance\n• ⚙️ Adjusting your preferences\n\nWhat would you like to know more about?`
+      } else if (input.includes("schedule") || input.includes("time") || input.includes("when")) {
+        responseContent = `Based on your ${userPreferences.timePreference} preference, I recommend:\n\n• Aim for ${userPreferences.workoutsPerWeek} workouts per week\n• Each session around ${userPreferences.workoutDuration} minutes\n• Use the calendar above to track your progress\n\nWould you like me to suggest specific days?`
+      } else {
+        responseContent = `I understand you're asking about "${chatInput}". As your AI fitness assistant, I'm here to help with workouts, nutrition, and scheduling. \n\nCurrent preferences: ${userPreferences.fitnessGoal}, ${userPreferences.experienceLevel} level\n\nHow can I assist with your fitness goals today?`
+      }
+
       const aiResponse: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: `I understand you want to ${chatInput}. Based on your current preferences (${userPreferences.fitnessGoal}, ${userPreferences.experienceLevel} level), I can help you adjust your workout plan. Would you like me to modify today's workout or update your preferences?`,
+        content: responseContent,
         timestamp: new Date(),
       }
       setChatMessages((prev) => [...prev, aiResponse])
     }, 1000)
 
     setChatInput("")
+  }
+
+  const getWorkoutSuggestion = (): string => {
+    const workoutTypes = userPreferences.preferredWorkouts
+    const equipment = userPreferences.equipment
+    const intensity = userPreferences.intensityLevel
+    
+    if (workoutTypes.includes(WorkoutType.STRENGTH)) {
+      return `${intensity} strength training with ${equipment.toLowerCase()}`
+    } else if (workoutTypes.includes(WorkoutType.CARDIO)) {
+      return `${intensity} cardio session (${userPreferences.workoutDuration} minutes)`
+    } else if (workoutTypes.includes(WorkoutType.HIIT)) {
+      return `${intensity} HIIT workout for maximum efficiency`
+    } else {
+      return `${intensity} ${workoutTypes[0]?.toLowerCase()} session`
+    }
   }
 
   const AuthDialog = ({ type }: { type: "login" | "register" }) => {
