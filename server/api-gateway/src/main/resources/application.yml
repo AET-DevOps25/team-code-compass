@@ -4,12 +4,33 @@ spring:
   cloud:
     gateway:
       routes:
+        # User service routes - handle /api/v1/users/** directly
         - id: user-service
           uri: lb://user-service
           predicates:
-            - Path=/api/users/**
+            - Path=/api/v1/users/**
+
+        # User service routes via service discovery path
+        - id: user-service-discovery
+          uri: lb://user-service
+          predicates:
+            - Path=/user-service/api/v1/users/**
           filters:
-            - StripPrefix=1
+            - RewritePath=/user-service/(?<segment>.*), /${segment}
+
+        # Auth service routes - route /auth/** to user service
+        - id: auth-service
+          uri: lb://user-service
+          predicates:
+            - Path=/auth/**
+
+        # Auth service routes via service discovery path
+        - id: auth-service-discovery
+          uri: lb://user-service
+          predicates:
+            - Path=/user-service/auth/**
+          filters:
+            - RewritePath=/user-service/(?<segment>.*), /${segment}
 
         - id: workout-plan-service
           uri: lb://workout-plan-service
@@ -43,7 +64,7 @@ spring:
 
       discovery:
         locator:
-          enabled: true
+          enabled: false
           lower-case-service-id: true
 
 server:
