@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -36,6 +36,8 @@ import {
 import ReactMarkdown from "react-markdown"
 import { useAuth } from "../src/hooks/useAuth"
 import { Gender } from "../src/types/user"
+import { workoutService } from "../src/services/workoutService"
+import { SportType as WorkoutServiceSportType } from "../src/types/workout"
 
 // Types and Enums
 enum FitnessGoal {
@@ -164,477 +166,124 @@ export default function FlexFitApp() {
     workoutDuration: 45,
     workoutsPerWeek: 3,
   })
+  
+  // Dynamic workout sessions state
+  const [workoutSessions, setWorkoutSessions] = useState<Record<string, WorkoutSession>>({})
+  const [isLoadingWorkouts, setIsLoadingWorkouts] = useState(false)
+  const [workoutError, setWorkoutError] = useState<string | null>(null)
 
-  const workoutSessions: Record<string, WorkoutSession> = {
-    // Past completed workouts (Green) - Recent past dates
-    "2025-01-08": {
-      id: "1",
-      name: "Full Body Strength",
-      type: WorkoutType.STRENGTH,
-      duration: 45,
+  // Function to load workouts from backend
+  const loadWorkouts = useCallback(async () => {
+    if (!user?.id) return
+
+    setIsLoadingWorkouts(true)
+    setWorkoutError(null)
+
+    try {
+      // Get workouts for current month
+      const startDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1)
+      const endDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0)
+      
+      const response = await workoutService.getMyWorkoutsByDateRange({
+        startDate: startDate.toISOString().split('T')[0],
+        endDate: endDate.toISOString().split('T')[0]
+      }, user.id)
+
+      if (response.error) {
+        setWorkoutError(response.error.error)
+        return
+      }
+
+      const workouts = response.data || []
+      const workoutMap: Record<string, WorkoutSession> = {}
+
+      // Convert backend workouts to frontend format
+      workouts.forEach(workout => {
+        const sportTypeMap: Record<string, WorkoutType> = {
+          'STRENGTH': WorkoutType.STRENGTH,
+          'HIIT': WorkoutType.HIIT,
+          'YOGA_MOBILITY': WorkoutType.YOGA,
+          'RUNNING_INTERVALS': WorkoutType.RUNNING
+        }
+
+        const statusMap: Record<string, WorkoutStatus> = {
+          'COMPLETED': WorkoutStatus.COMPLETED,
+          'PENDING': WorkoutStatus.PLANNED,
+          'IN_PROGRESS': WorkoutStatus.PLANNED,
+          'SKIPPED': WorkoutStatus.NONE
+        }
+
+        workoutMap[workout.dayDate] = {
+          id: workout.id,
+          name: `${workout.focusSportTypeForTheDay.replace('_', ' ')} Training`,
+          type: sportTypeMap[workout.focusSportTypeForTheDay] || WorkoutType.STRENGTH,
+          duration: workout.scheduledExercises?.reduce((total, exercise) => {
+            const match = exercise.prescribedSetsRepsDuration.match(/(\d+)\s*(?:min|minute)/i)
+            return total + (match ? parseInt(match[1]) : 0)
+          }, 0) || 30,
+          difficulty: IntensityLevel.MODERATE,
+          equipment: Equipment.BASIC,
+          status: statusMap[workout.completionStatus] || WorkoutStatus.PLANNED,
+          content: workout.markdownContent || '',
+          date: workout.dayDate
+        }
+      })
+
+      setWorkoutSessions(workoutMap)
+    } catch (error) {
+      console.error('Error loading workouts:', error)
+      setWorkoutError('Failed to load workouts')
+    } finally {
+      setIsLoadingWorkouts(false)
+    }
+  }, [user?.id, currentMonth])
+
+  // Function to refresh workouts after generation
+  const refreshWorkouts = useCallback(async () => {
+    await loadWorkouts()
+  }, [loadWorkouts])
+
+  // Function to add a new workout to the sessions
+  const addWorkoutToSessions = useCallback((workout: any) => {
+    const sportTypeMap: Record<string, WorkoutType> = {
+      'STRENGTH': WorkoutType.STRENGTH,
+      'HIIT': WorkoutType.HIIT,
+      'YOGA_MOBILITY': WorkoutType.YOGA,
+      'RUNNING_INTERVALS': WorkoutType.RUNNING
+    }
+
+    const newWorkoutSession: WorkoutSession = {
+      id: workout.id,
+      name: `${workout.focusSportTypeForTheDay.replace('_', ' ')} Training`,
+      type: sportTypeMap[workout.focusSportTypeForTheDay] || WorkoutType.STRENGTH,
+      duration: workout.scheduledExercises?.reduce((total: number, exercise: any) => {
+        const match = exercise.prescribedSetsRepsDuration.match(/(\d+)\s*(?:min|minute)/i)
+        return total + (match ? parseInt(match[1]) : 0)
+      }, 0) || 30,
       difficulty: IntensityLevel.MODERATE,
       equipment: Equipment.BASIC,
-      status: WorkoutStatus.COMPLETED,
-      date: "2025-01-08",
-      content: `# Full Body Strength 💪
-
-## Warm-up (5 minutes)
-- **Arm circles**: 1 minute each direction
-- **Leg swings**: 1 minute each leg
-- **Light jogging in place**: 2 minutes
-
-## Main Workout (35 minutes)
-
-### Upper Body Circuit (15 minutes)
-| Exercise | Sets | Reps | Rest |
-|----------|------|------|------|
-| **Push-ups** | 3 | 12-15 | 60s |
-| **Dumbbell Rows** | 3 | 10-12 | 60s |
-| **Shoulder Press** | 3 | 8-10 | 90s |
-
-### Lower Body Circuit (15 minutes)
-| Exercise | Sets | Reps | Rest |
-|----------|------|------|------|
-| **Squats** | 3 | 15-20 | 60s |
-| **Lunges** | 3 | 12 each leg | 60s |
-| **Calf Raises** | 3 | 20 | 45s |
-
-### Core Finisher (5 minutes)
-- **Plank**: 3 × 30 seconds
-- **Russian Twists**: 3 × 20
-- **Dead Bug**: 3 × 10 each side
-
-## Cool Down (5 minutes)
-- Full body stretching routine
-
----
-**Calories Burned**: ~320 kcal  
-**Difficulty**: ⭐⭐⭐⚪⚪  
-**Status**: ✅ **COMPLETED**`,
-    },
-    "2025-01-10": {
-      id: "2",
-      name: "HIIT Cardio Blast",
-      type: WorkoutType.HIIT,
-      duration: 30,
-      difficulty: IntensityLevel.HIGH,
-      equipment: Equipment.NONE,
-      status: WorkoutStatus.COMPLETED,
-      date: "2025-01-10",
-      content: `# HIIT Cardio Blast 🔥
-
-## Overview
-High-intensity interval training to boost cardiovascular fitness and burn calories.
-
-## Warm-up (5 minutes)
-- **Marching in place**: 2 minutes
-- **Arm swings**: 1 minute
-- **Light stretching**: 2 minutes
-
-## HIIT Rounds (20 minutes)
-**4 rounds × 4 exercises × 45s work / 15s rest**
-
-### Round Structure
-| Exercise | Work | Rest | Notes |
-|----------|------|------|-------|
-| **Burpees** | 45s | 15s | Full body explosive |
-| **Mountain Climbers** | 45s | 15s | Keep core tight |
-| **Jump Squats** | 45s | 15s | Land softly |
-| **High Knees** | 45s | 15s | Drive knees up |
-
-**2 minutes rest between rounds**
-
-## Cool Down (5 minutes)
-- Walking in place: 2 minutes
-- Static stretches: 3 minutes
-
----
-**Peak Heart Rate**: 85-95% max HR  
-**Calories Burned**: ~280 kcal  
-**Status**: ✅ **COMPLETED**`,
-    },
-    "2025-01-12": {
-      id: "3",
-      name: "Upper Body Power",
-      type: WorkoutType.STRENGTH,
-      duration: 40,
-      difficulty: IntensityLevel.MODERATE,
-      equipment: Equipment.BASIC,
-      status: WorkoutStatus.COMPLETED,
-      date: "2025-01-12",
-      content: `# Upper Body Power 💥
-
-## Focus
-Chest, shoulders, and triceps with compound and isolation movements.
-
-## Warm-up (5 minutes)
-- **Arm circles**: 2 minutes
-- **Push-up to downward dog**: 2 minutes
-- **Shoulder rolls**: 1 minute
-
-## Main Workout (30 minutes)
-
-### Primary Movements
-| Exercise | Sets | Reps | Weight |
-|----------|------|------|--------|
-| **Push-ups** | 4 | 12-15 | Bodyweight |
-| **Pike Push-ups** | 3 | 8-10 | Bodyweight |
-| **Dumbbell Press** | 4 | 10-12 | 25 lbs each |
-
-### Secondary Work
-- **Lateral Raises**: 3 × 15 (15 lbs)
-- **Tricep Dips**: 3 × 12-15
-- **Overhead Press**: 3 × 10 (20 lbs each)
-- **Diamond Push-ups**: 2 × 8-10
-
-## Cool Down (5 minutes)
-- Chest doorway stretch
-- Shoulder cross-body stretch
-- Tricep overhead stretch
-
----
-**Focus**: Upper body strength and endurance  
-**Status**: ✅ **COMPLETED**`,
-    },
-
-    // Rest days (Yellow)
-    "2025-01-09": {
-      id: "4",
-      name: "Active Recovery",
-      type: WorkoutType.YOGA,
-      duration: 20,
-      difficulty: IntensityLevel.LOW,
-      equipment: Equipment.BASIC,
-      status: WorkoutStatus.REST,
-      date: "2025-01-09",
-      content: `# Active Recovery Day 🧘‍♀️
-
-## Purpose
-Gentle movement to promote recovery and maintain mobility.
-
-## Light Movement (20 minutes)
-
-### Gentle Flow (15 minutes)
-- **Child's Pose**: 2 minutes
-- **Cat-Cow stretches**: 3 minutes
-- **Gentle spinal twists**: 3 minutes
-- **Hip circles**: 2 minutes
-- **Shoulder rolls**: 2 minutes
-- **Deep breathing**: 3 minutes
-
-### Optional Activities
-- **Easy walk**: 10-15 minutes
-- **Light stretching**: As needed
-- **Foam rolling**: 5-10 minutes
-
-## Recovery Focus
-- **Hydration**: 2.5+ liters of water
-- **Sleep**: Aim for 8+ hours
-- **Nutrition**: Anti-inflammatory foods
-
----
-**Activity Level**: Very light  
-**Benefits**: Recovery and flexibility  
-**Status**: 😴 **REST DAY**`,
-    },
-    "2025-01-11": {
-      id: "5",
-      name: "Rest & Mobility",
-      type: WorkoutType.YOGA,
-      duration: 15,
-      difficulty: IntensityLevel.LOW,
-      equipment: Equipment.NONE,
-      status: WorkoutStatus.REST,
-      date: "2025-01-11",
-      content: `# Rest & Mobility Day 🌱
-
-## Recovery Focus
-Today is about gentle movement and mental relaxation.
-
-## Mobility Routine (15 minutes)
-
-### Upper Body (5 minutes)
-- **Neck stretches**: 1 minute each direction
-- **Shoulder shrugs**: 1 minute
-- **Arm circles**: 2 minutes
-
-### Lower Body (5 minutes)
-- **Hip circles**: 2 minutes
-- **Leg swings**: 2 minutes
-- **Ankle rolls**: 1 minute
-
-### Core & Spine (5 minutes)
-- **Gentle spinal twists**: 3 minutes
-- **Cat-cow stretches**: 2 minutes
-
-## Wellness Activities
-- **Meditation**: 10-15 minutes
-- **Reading**: Relaxation time
-- **Nature walk**: If weather permits
-
----
-**Intensity**: Minimal  
-**Focus**: Recovery and mental health  
-**Status**: 😴 **REST DAY**`,
-    },
-    "2025-01-13": {
-      id: "6",
-      name: "Complete Rest",
-      type: WorkoutType.YOGA,
-      duration: 0,
-      difficulty: IntensityLevel.LOW,
-      equipment: Equipment.NONE,
-      status: WorkoutStatus.REST,
-      date: "2025-01-13",
-      content: `# Complete Rest Day 😴
-
-## Why Complete Rest?
-After intense training, your body needs time to repair and grow stronger.
-
-## Rest Day Benefits
-- **Muscle repair** and growth
-- **Nervous system** recovery
-- **Mental** recharge
-- **Injury prevention**
-- **Hormone balance**
-
-## Optional Light Activities
-Choose only if you feel energetic:
-
-### Gentle Options (10-15 minutes max)
-- **Easy walk** in fresh air
-- **Light stretching** routine
-- **Deep breathing** exercises
-- **Meditation** or mindfulness
-
-## Recovery Checklist
-- ✅ **Sleep**: 8+ hours of quality sleep
-- ✅ **Hydration**: 3+ liters of water
-- ✅ **Nutrition**: Protein-rich, anti-inflammatory foods
-- ✅ **Stress management**: Relaxation techniques
-
-## Tomorrow's Preview
-Get ready for an exciting **CrossFit workout** tomorrow!
-
----
-**Activity Level**: None to minimal  
-**Focus**: Complete recovery  
-**Status**: 😴 **COMPLETE REST**
-
-> 💚 **Remember: Rest days are when the magic happens - your body gets stronger!**`,
-    },
-
-    // Upcoming planned workouts (Blue)
-    "2025-01-15": {
-      id: "7",
-      name: "CrossFit WOD: Cindy",
-      type: WorkoutType.CROSSFIT,
-      duration: 25,
-      difficulty: IntensityLevel.HIGH,
-      equipment: Equipment.BASIC,
       status: WorkoutStatus.PLANNED,
-      date: "2025-01-15",
-      content: `# CrossFit WOD: "Cindy" 🏋️‍♀️
+      content: workout.markdownContent || '',
+      date: workout.dayDate
+    }
 
-## The Workout
-**AMRAP 20** (As Many Rounds As Possible in 20 minutes)
-- **5 Pull-ups** (or assisted)
-- **10 Push-ups**
-- **15 Air Squats**
+    setWorkoutSessions(prev => ({
+      ...prev,
+      [workout.dayDate]: newWorkoutSession
+    }))
+  }, [])
 
-## Warm-up (5 minutes)
-- **Row or jump rope**: 3 minutes
-- **Dynamic stretching**: 2 minutes
-- **Movement practice**: Light versions of workout movements
+  // Load workouts when component mounts or month changes
+  useEffect(() => {
+    loadWorkouts()
+  }, [loadWorkouts, currentMonth])
 
-## Strategy Tips
-1. **Pace yourself** - aim for consistent rounds
-2. **Break up reps** if needed (e.g., 3+2 pull-ups)
-3. **Breathe** during transitions
-4. **Track your rounds** + additional reps
-
-## Scaling Options
-
-### Beginner
-- **Pull-ups**: Assisted or ring rows
-- **Push-ups**: Knee push-ups or incline
-- **Air Squats**: Chair-assisted if needed
-
-### Intermediate (RX)
-- All movements as prescribed
-- Focus on consistent pace
-
-### Advanced
-- **Pull-ups**: Chest-to-bar
-- **Push-ups**: Handstand push-ups
-- **Air Squats**: Jump squats
-
-## Target Scores
-- **Beginner**: 8-12 rounds
-- **Intermediate**: 12-16 rounds
-- **Advanced**: 16-20+ rounds
-
----
-**Intensity**: Very High  
-**Focus**: Muscular endurance  
-**Status**: 📅 **SCHEDULED**
-
-> 🔥 **"Cindy" is a classic benchmark WOD - give it everything you've got!**`,
-    },
-    "2025-01-17": {
-      id: "8",
-      name: "5K Run Training",
-      type: WorkoutType.RUNNING,
-      duration: 35,
-      difficulty: IntensityLevel.MODERATE,
-      equipment: Equipment.NONE,
-      status: WorkoutStatus.PLANNED,
-      date: "2025-01-17",
-      content: `# 5K Run Training 🏃‍♀️
-
-## Training Goal
-Build endurance and improve 5K pace with structured intervals.
-
-## Pre-Run (5 minutes)
-- **Light walking**: 2 minutes
-- **Dynamic warm-up**: 3 minutes
-  - Leg swings, high knees, butt kicks
-  - Ankle circles, calf raises
-
-## Main Run (25 minutes)
-
-### Interval Structure
-| Phase | Duration | Intensity | Pace |
-|-------|----------|-----------|------|
-| **Warm-up Run** | 5 min | Easy | Conversational |
-| **Interval 1** | 3 min | Hard | 5K pace |
-| **Recovery** | 2 min | Easy | Slow jog |
-| **Interval 2** | 3 min | Hard | 5K pace |
-| **Recovery** | 2 min | Easy | Slow jog |
-| **Interval 3** | 3 min | Hard | 5K pace |
-| **Cool-down** | 7 min | Easy | Conversational |
-
-## Running Form Focus
-- **Posture**: Tall spine, slight forward lean
-- **Cadence**: ~180 steps per minute
-- **Foot strike**: Midfoot landing
-- **Arms**: Relaxed, 90-degree angle
-
-## Post-Run (5 minutes)
-- **Cool-down walk**: 2 minutes
-- **Stretching**: 3 minutes
-  - Calf, quad, hamstring, hip flexor
-
----
-**Target Heart Rate**: 70-85% max HR  
-**Calories**: ~300-350 kcal  
-**Status**: 📅 **SCHEDULED**`,
-    },
-    "2025-01-19": {
-      id: "9",
-      name: "Lower Body Strength",
-      type: WorkoutType.STRENGTH,
-      duration: 45,
-      difficulty: IntensityLevel.HIGH,
-      equipment: Equipment.BASIC,
-      status: WorkoutStatus.PLANNED,
-      date: "2025-01-19",
-      content: `# Lower Body Strength 🦵
-
-## Focus
-Comprehensive leg and glute workout for strength and power.
-
-## Warm-up (8 minutes)
-- **Dynamic leg swings**: 2 minutes
-- **Bodyweight squats**: 2 minutes
-- **Walking lunges**: 2 minutes
-- **Calf raises**: 2 minutes
-
-## Main Workout (32 minutes)
-
-### Compound Movements (20 minutes)
-| Exercise | Sets | Reps | Rest |
-|----------|------|------|------|
-| **Goblet Squats** | 4 | 12-15 | 90s |
-| **Romanian Deadlifts** | 4 | 10-12 | 90s |
-| **Bulgarian Split Squats** | 3 | 10 each leg | 60s |
-
-### Isolation Work (12 minutes)
-- **Single-leg Glute Bridges**: 3 × 12 each leg
-- **Wall Sit**: 3 × 45 seconds
-- **Calf Raises**: 3 × 20
-- **Lateral Lunges**: 3 × 10 each side
-
-## Finisher Circuit (3 minutes)
-- **Jump Squats**: 30 seconds
-- **Rest**: 30 seconds
-- **Repeat 3 times**
-
-## Cool Down (5 minutes)
-- Quad stretch, hamstring stretch
-- Hip flexor stretch, calf stretch
-- Glute stretch
-
----
-**Focus**: Lower body strength and power  
-**Difficulty**: ⭐⭐⭐⭐⚪  
-**Status**: 📅 **SCHEDULED**`,
-    },
-    "2025-01-21": {
-      id: "10",
-      name: "HIIT Tabata Circuit",
-      type: WorkoutType.HIIT,
-      duration: 20,
-      difficulty: IntensityLevel.EXTREME,
-      equipment: Equipment.NONE,
-      status: WorkoutStatus.PLANNED,
-      date: "2025-01-21",
-      content: `# HIIT Tabata Circuit ⚡
-
-## Protocol
-**Tabata Format**: 20 seconds all-out work / 10 seconds rest
-**4 exercises × 8 rounds each = 16 minutes total**
-
-## Circuit Breakdown
-
-### Round 1: Burpees (4 minutes)
-- **Work**: 20 seconds maximum burpees
-- **Rest**: 10 seconds active recovery
-- **Repeat**: 8 times
-
-### Round 2: Mountain Climbers (4 minutes)
-- **Work**: 20 seconds fast mountain climbers
-- **Rest**: 10 seconds hold plank
-- **Repeat**: 8 times
-
-### Round 3: Jump Squats (4 minutes)
-- **Work**: 20 seconds explosive jump squats
-- **Rest**: 10 seconds bodyweight squats
-- **Repeat**: 8 times
-
-### Round 4: High Knees (4 minutes)
-- **Work**: 20 seconds maximum high knees
-- **Rest**: 10 seconds marching in place
-- **Repeat**: 8 times
-
-## Intensity Guidelines
-- **Work Phase**: 95-100% maximum effort
-- **Rest Phase**: Keep moving, don't stop completely
-- **Between Rounds**: 1 minute active recovery
-
-## Expected Results
-- **Heart Rate**: 85-95% max during work phases
-- **Calories**: ~200-250 kcal
-- **EPOC**: Elevated metabolism for 12+ hours post-workout
-
----
-**Total Time**: 20 minutes  
-**Difficulty**: ⭐⭐⭐⭐⭐  
-**Status**: 📅 **SCHEDULED**
-
-> 🔥 **Tabata is scientifically proven to improve both aerobic and anaerobic capacity in just 4 minutes per exercise!**`,
-    },
-  }
+  // Clear workouts when user logs out
+  useEffect(() => {
+    if (!user?.id) {
+      setWorkoutSessions({})
+    }
+  }, [user?.id])
 
   useEffect(() => {
     // Load workout for selected date with proper error handling
@@ -644,7 +293,7 @@ Comprehensive leg and glute workout for strength and power.
 
     // Debug log to verify data loading
     console.log(`Selected date: ${dateKey}, Workout found:`, workout ? workout.name : "None")
-  }, [selectedDate])
+  }, [selectedDate, workoutSessions])
 
   const getDateStatus = (date: Date): WorkoutStatus => {
     const dateKey = date.toISOString().split("T")[0]
@@ -762,7 +411,7 @@ Comprehensive leg and glute workout for strength and power.
     return days
   }
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!chatInput.trim()) return
 
     const userMessage: ChatMessage = {
@@ -774,18 +423,357 @@ Comprehensive leg and glute workout for strength and power.
 
     setChatMessages((prev) => [...prev, userMessage])
 
-    // Simulate AI response
-    setTimeout(() => {
+    // Show "typing" indicator
+    const typingMessage: ChatMessage = {
+      id: "typing",
+      role: "assistant",
+      content: "🤖 Generating your workout plan...",
+      timestamp: new Date(),
+    }
+    setChatMessages((prev) => [...prev, typingMessage])
+
+    try {
+      const input = chatInput.toLowerCase()
+      let responseContent = ""
+
+      // Check for workout generation requests first
+      if (input.includes("create") && (input.includes("workout") || input.includes("training") || input.includes("plan")) || 
+          input.includes("generate") && input.includes("workout") ||
+          input.includes("crossfit") || input.includes("week") && input.includes("training")) {
+        
+        const workoutRequest = parseWorkoutRequest(input)
+        responseContent = await generateWorkoutPlan(workoutRequest)
+        
+      } else if (input.includes("workout") || input.includes("exercise")) {
+        responseContent = `Here are some workout suggestions based on your ${userPreferences.fitnessGoal} goal and ${userPreferences.experienceLevel} level:\n\n• ${getWorkoutSuggestion()}\n• Try saying "create me a 1 week crossfit training" for AI-generated plans\n• I can help you adjust intensity or duration if needed!`
+      } else if (input.includes("diet") || input.includes("nutrition") || input.includes("food")) {
+        responseContent = `For your ${userPreferences.fitnessGoal} goal, here are some nutrition tips:\n\n• Focus on balanced meals with protein, carbs, and healthy fats\n• Stay hydrated throughout the day\n• Consider your ${userPreferences.dietaryPreference} preferences\n\nWould you like specific meal suggestions?`
+      } else if (input.includes("help") || input.includes("?")) {
+        responseContent = `I'm here to help with your fitness journey! I can assist with:\n\n• 💪 **AI Workout Generation** - Say "create me a 1 week crossfit training"\n• 📅 Scheduling your fitness routine\n• 🥗 Basic nutrition guidance\n• ⚙️ Adjusting your preferences\n\n**Try these commands:**\n• "Create me a 3 day strength training"\n• "Generate a week of HIIT workouts"\n• "I need a yoga session"`
+      } else if (input.includes("schedule") || input.includes("time") || input.includes("when")) {
+        responseContent = `Based on your ${userPreferences.timePreference} preference, I recommend:\n\n• Aim for ${userPreferences.workoutsPerWeek} workouts per week\n• Each session around ${userPreferences.workoutDuration} minutes\n• Use the calendar above to track your progress\n\nWould you like me to generate a specific workout schedule?`
+      } else {
+        responseContent = `I understand you're asking about "${chatInput}". As your AI fitness assistant, I can:\n\n🤖 **Generate Real Workouts** - Try: "create me a 1 week crossfit training"\n📋 **Plan Your Schedule** - I'll create personalized workout plans\n💾 **Save Everything** - All workouts are saved to your calendar\n\nCurrent preferences: ${userPreferences.fitnessGoal}, ${userPreferences.experienceLevel} level\n\nWhat workout would you like me to create?`
+      }
+
+      // Remove typing indicator and add real response
+      setChatMessages((prev) => prev.filter(msg => msg.id !== "typing"))
+      
       const aiResponse: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: `I understand you want to ${chatInput}. Based on your current preferences (${userPreferences.fitnessGoal}, ${userPreferences.experienceLevel} level), I can help you adjust your workout plan. Would you like me to modify today's workout or update your preferences?`,
+        content: responseContent,
         timestamp: new Date(),
       }
       setChatMessages((prev) => [...prev, aiResponse])
-    }, 1000)
+      
+    } catch (error) {
+      console.error("Chat error:", error)
+      
+      // Remove typing indicator and show error
+      setChatMessages((prev) => prev.filter(msg => msg.id !== "typing"))
+      
+      const errorResponse: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: "❌ Sorry, I encountered an error. Please try again or make sure you're logged in.",
+        timestamp: new Date(),
+      }
+      setChatMessages((prev) => [...prev, errorResponse])
+    }
 
     setChatInput("")
+  }
+
+  const getWorkoutSuggestion = (): string => {
+    const workoutTypes = userPreferences.preferredWorkouts
+    const equipment = userPreferences.equipment
+    const intensity = userPreferences.intensityLevel
+    
+    if (workoutTypes.includes(WorkoutType.STRENGTH)) {
+      return `${intensity} strength training with ${equipment.toLowerCase()}`
+    } else if (workoutTypes.includes(WorkoutType.CARDIO)) {
+      return `${intensity} cardio session (${userPreferences.workoutDuration} minutes)`
+    } else if (workoutTypes.includes(WorkoutType.HIIT)) {
+      return `${intensity} HIIT workout for maximum efficiency`
+    } else {
+      return `${intensity} ${workoutTypes[0]?.toLowerCase()} session`
+    }
+  }
+
+  const parseWorkoutRequest = (input: string) => {
+    const lowerInput = input.toLowerCase()
+    
+    // Extract days with more sophisticated patterns
+    let days = 1
+    
+    // Check for specific day patterns
+    const dayPatterns = [
+      { pattern: /(\d+)\s*(?:day|days)/i, multiplier: 1 },
+      { pattern: /(\d+)\s*(?:week|weeks)/i, multiplier: 7 },
+      { pattern: /(?:a|one)\s*week/i, value: 7 },
+      { pattern: /(?:two|2)\s*week/i, value: 14 },
+      { pattern: /(?:three|3)\s*week/i, value: 21 },
+      { pattern: /(?:four|4)\s*week/i, value: 28 },
+      { pattern: /(?:half|0\.5)\s*week/i, value: 3 },
+      { pattern: /(?:full|complete)\s*week/i, value: 7 },
+      { pattern: /(?:quick|short)\s*(?:week|plan)/i, value: 3 },
+      { pattern: /(?:intensive|intense)\s*(?:week|plan)/i, value: 5 },
+      { pattern: /(?:month|monthly)/i, value: 30 }
+    ]
+
+    for (const { pattern, multiplier, value } of dayPatterns) {
+      const match = lowerInput.match(pattern)
+      if (match) {
+        if (value) {
+          days = value
+        } else if (multiplier && match[1]) {
+          days = parseInt(match[1]) * multiplier
+        }
+        break
+      }
+    }
+
+    // Ensure days is within reasonable bounds
+    days = Math.max(1, Math.min(30, days))
+
+    // Enhanced sport type mapping with more keywords
+    let sportType = WorkoutServiceSportType.STRENGTH // default
+    
+    const sportPatterns = [
+      {
+        type: WorkoutServiceSportType.HIIT,
+        keywords: ['hiit', 'crossfit', 'cross fit', 'tabata', 'circuit', 'intervals', 'intensive', 'intense', 'cardio blast', 'fat burn', 'metabolic']
+      },
+      {
+        type: WorkoutServiceSportType.STRENGTH,
+        keywords: ['strength', 'weight', 'muscle', 'lifting', 'resistance', 'bodybuilding', 'powerlifting', 'gains', 'bulk', 'pump', 'iron']
+      },
+      {
+        type: WorkoutServiceSportType.YOGA_MOBILITY,
+        keywords: ['yoga', 'mobility', 'stretch', 'flexibility', 'pilates', 'mindful', 'meditation', 'zen', 'flow', 'balance', 'relaxation']
+      },
+      {
+        type: WorkoutServiceSportType.RUNNING_INTERVALS,
+        keywords: ['running', 'cardio', 'endurance', 'marathon', 'sprint', 'jog', 'treadmill', 'outdoor', 'distance', 'pace']
+      }
+    ]
+
+    for (const { type, keywords } of sportPatterns) {
+      if (keywords.some(keyword => lowerInput.includes(keyword))) {
+        sportType = type
+        break
+      }
+    }
+
+    // Extract duration with more patterns
+    let duration = userPreferences.workoutDuration
+    const durationPatterns = [
+      /(\d+)\s*(?:min|minute|minutes)/i,
+      /(\d+)\s*(?:hour|hours|hr|hrs)/i,
+      /(?:quick|short)\s*(?:workout|session)/i,
+      /(?:long|extended)\s*(?:workout|session)/i,
+      /(?:full|complete)\s*(?:workout|session)/i
+    ]
+
+    for (const pattern of durationPatterns) {
+      const match = lowerInput.match(pattern)
+      if (match) {
+        if (match[1]) {
+          const value = parseInt(match[1])
+          // Convert hours to minutes if necessary
+          duration = pattern.source.includes('hour') ? value * 60 : value
+        } else if (pattern.source.includes('quick|short')) {
+          duration = 20
+        } else if (pattern.source.includes('long|extended')) {
+          duration = 60
+        } else if (pattern.source.includes('full|complete')) {
+          duration = 45
+        }
+        break
+      }
+    }
+
+    // Ensure duration is within reasonable bounds
+    duration = Math.max(15, Math.min(120, duration))
+
+    // Extract equipment preferences
+    let equipment = null
+    const equipmentPatterns = [
+      { pattern: /no\s*equipment|bodyweight|body\s*weight/i, value: 'NO_EQUIPMENT' },
+      { pattern: /dumbbells?|weights?/i, value: 'DUMBBELLS' },
+      { pattern: /kettlebells?/i, value: 'KETTLEBELL' },
+      { pattern: /bands?|resistance\s*bands?/i, value: 'RESISTANCE_BANDS' },
+      { pattern: /gym|full\s*gym/i, value: 'FULL_GYM' },
+      { pattern: /home\s*gym/i, value: 'HOME_GYM' }
+    ]
+
+    for (const { pattern, value } of equipmentPatterns) {
+      if (pattern.test(lowerInput)) {
+        equipment = value
+        break
+      }
+    }
+
+    // Extract fitness level
+    let fitnessLevel = null
+    const levelPatterns = [
+      { pattern: /beginner|newbie|new\s*to/i, value: 'BEGINNER' },
+      { pattern: /intermediate|moderate/i, value: 'INTERMEDIATE' },
+      { pattern: /advanced|experienced/i, value: 'ADVANCED' },
+      { pattern: /expert|professional/i, value: 'EXPERT' }
+    ]
+
+    for (const { pattern, value } of levelPatterns) {
+      if (pattern.test(lowerInput)) {
+        fitnessLevel = value
+        break
+      }
+    }
+
+    return { 
+      days, 
+      sportType, 
+      duration,
+      equipment,
+      fitnessLevel,
+      // Add metadata for better responses
+      requestType: days > 1 ? 'multi-day' : 'single-day',
+      sportName: sportType.replace('_', ' ').toLowerCase(),
+      isQuick: lowerInput.includes('quick') || lowerInput.includes('short'),
+      isIntense: lowerInput.includes('intense') || lowerInput.includes('intensive')
+    }
+  }
+
+  const generateWorkoutPlan = async (request: any) => {
+    if (!user?.id) {
+      return "❌ Please log in to generate workout plans!"
+    }
+
+    const { days, sportType, duration, equipment, fitnessLevel, requestType, sportName, isQuick, isIntense } = request
+
+    try {
+      const today = new Date()
+      const generatedWorkouts = []
+      const totalWorkouts = days
+      let currentWorkout = 0
+
+      // Show initial progress message for multi-day plans
+      if (days > 1) {
+        const progressMessage: ChatMessage = {
+          id: "progress",
+          role: "assistant",
+          content: `🚀 **Starting ${days}-day ${sportName} plan generation...**\n\n📊 **Progress: 0/${totalWorkouts} workouts created**\n\n⏳ This may take a few moments...`,
+          timestamp: new Date(),
+        }
+        setChatMessages((prev) => [...prev.filter(msg => msg.id !== "typing"), progressMessage])
+      }
+
+      for (let i = 0; i < days; i++) {
+        const workoutDate = new Date(today)
+        workoutDate.setDate(today.getDate() + i)
+        
+        try {
+          const response = await workoutService.generateWorkoutPlan({
+            sportType,
+            targetDurationMinutes: duration,
+            date: workoutDate.toISOString().split('T')[0]
+          }, user.id)
+
+          if (response.data) {
+            generatedWorkouts.push({
+              date: workoutDate.toLocaleDateString(),
+              workout: response.data
+            })
+            currentWorkout++
+
+            // Update progress for multi-day plans
+            if (days > 1) {
+              const progressMessage: ChatMessage = {
+                id: "progress",
+                role: "assistant",
+                content: `🚀 **Generating ${days}-day ${sportName} plan...**\n\n📊 **Progress: ${currentWorkout}/${totalWorkouts} workouts created**\n\n${currentWorkout === totalWorkouts ? '🎉 **Generation complete!**' : '⏳ Working on next workout...'}`,
+                timestamp: new Date(),
+              }
+              setChatMessages((prev) => [...prev.filter(msg => msg.id !== "progress"), progressMessage])
+            }
+          }
+        } catch (error) {
+          console.error(`Error generating workout ${i + 1}:`, error)
+          // Continue with next workout even if one fails
+        }
+      }
+
+      // Remove progress message
+      setChatMessages((prev) => prev.filter(msg => msg.id !== "progress"))
+
+      if (generatedWorkouts.length === 0) {
+        return "❌ Failed to generate workout plan. Please try again."
+      }
+
+      // Format response based on request type
+      const intensity = isIntense ? "INTENSE" : isQuick ? "QUICK" : sportName.toUpperCase()
+      let responseText = `🎉 **${days}-Day ${intensity} Training Plan Generated!**\n\n`
+      
+      if (days === 1) {
+        const workout = generatedWorkouts[0].workout
+        responseText += `📅 **${generatedWorkouts[0].date}**\n`
+        responseText += `💪 **${workout.scheduledExercises?.length || 0} exercises** • **${duration} minutes**\n`
+        responseText += isIntense ? `⚡ **High intensity focus**\n` : isQuick ? `⚡ **Quick & effective**\n` : `🎯 **Balanced training**\n`
+        responseText += `\n${workout.markdownContent ? workout.markdownContent.substring(0, 300) + "..." : "Workout plan created successfully!"}`
+      } else {
+        responseText += `📈 **Generated ${generatedWorkouts.length} out of ${days} requested workouts**\n\n`
+        
+        const failedCount = days - generatedWorkouts.length
+        if (failedCount > 0) {
+          responseText += `⚠️ **${failedCount} workouts failed to generate** - you can try regenerating them individually\n\n`
+        }
+
+        generatedWorkouts.forEach((item, index) => {
+          const workout = item.workout
+          responseText += `📅 **Day ${index + 1}: ${item.date}**\n`
+          responseText += `• ${workout.scheduledExercises?.length || 0} exercises\n`
+          responseText += `• ${duration} minutes\n`
+          responseText += `• Focus: ${workout.focusSportTypeForTheDay.replace('_', ' ')}\n\n`
+        })
+        
+        responseText += `✅ All workouts saved to your calendar! Check the calendar above to view detailed exercise plans.\n\n`
+        responseText += `💡 **Tip:** Click on any date in the calendar to view the full workout details!`
+      }
+
+      // Add all generated workouts to the calendar state
+      generatedWorkouts.forEach(item => {
+        addWorkoutToSessions(item.workout)
+      })
+
+      // Refresh workouts from backend to ensure calendar is up to date
+      await refreshWorkouts()
+
+      // Update current workout if we generated one for today
+      const todayString = today.toISOString().split('T')[0]
+      const todayWorkout = generatedWorkouts.find(w => 
+        new Date(w.workout.dayDate).toISOString().split('T')[0] === todayString
+      )
+      if (todayWorkout) {
+        setCurrentWorkout({
+          id: todayWorkout.workout.id,
+          name: `${sportName.toUpperCase()} Training`,
+          type: WorkoutType.CROSSFIT, // Use local enum for display
+          duration,
+          difficulty: IntensityLevel.MODERATE,
+          equipment: Equipment.BASIC,
+          status: WorkoutStatus.PLANNED,
+          content: todayWorkout.workout.markdownContent || "",
+          date: todayString
+        })
+      }
+
+      return responseText
+
+    } catch (error) {
+      console.error("Error generating workout plan:", error)
+      return "❌ Error generating workout plan. Please check if you're logged in and try again."
+    }
   }
 
   const AuthDialog = ({ type }: { type: "login" | "register" }) => {
@@ -917,6 +905,16 @@ Comprehensive leg and glute workout for strength and power.
                 <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-md text-sm">
                   <div className="font-medium">❌ Error:</div>
                   <div>{error}</div>
+                  {/* Show validation details if available */}
+                  {detailedError?.error?.details && (
+                    <div className="mt-2 space-y-1">
+                      {Object.entries(detailedError.error.details).map(([field, message]) => (
+                        <div key={field} className="text-xs">
+                          • <span className="font-medium capitalize">{field}:</span> {message}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 
                 {/* Developer info - only show in development */}
@@ -969,6 +967,9 @@ Comprehensive leg and glute workout for strength and power.
                 onChange={(e) => handleInputChange('email', e.target.value)}
                 disabled={isSubmitting}
               />
+              {formData.email && !formData.email.includes('@') && (
+                <p className="text-xs text-amber-600">Please enter a valid email address</p>
+              )}
             </div>
             
             <div className="space-y-2">
@@ -979,7 +980,11 @@ Comprehensive leg and glute workout for strength and power.
                 value={formData.password}
                 onChange={(e) => handleInputChange('password', e.target.value)}
                 disabled={isSubmitting}
+                placeholder={type === "register" ? "Min. 8 characters" : ""}
               />
+              {type === "register" && formData.password && formData.password.length < 8 && (
+                <p className="text-xs text-amber-600">Password must be at least 8 characters long</p>
+              )}
             </div>
             
             {type === "register" && (
