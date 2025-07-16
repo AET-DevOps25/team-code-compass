@@ -98,10 +98,11 @@ genaiWorker:
   service:
     type: ClusterIP
     port: 8000
-  env:
-    OPEN_WEBUI_BASE_URL: "https://gpu.aet.cit.tum.de"
-    MODEL_NAME: "llama3.3:latest"
-    # CHAIR_API_KEY will be set via secret
+  env: 
+    - name: OPEN_WEBUI_BASE_URL
+      value: "https://gpu.aet.cit.tum.de"
+    - name: MODEL_NAME
+      value: "llama3.3:latest"
   resources:
     limits:
       cpu: 1000m
@@ -122,7 +123,8 @@ frontend:
     type: ClusterIP
     port: 80
   env:
-    NEXT_PUBLIC_API_URL: "http://api-gateway:8000"
+    - name: NEXT_PUBLIC_API_URL
+      value: "http://api-gateway:8000"
   resources:
     limits:
       cpu: 250m
