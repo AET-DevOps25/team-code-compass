@@ -1,0 +1,36 @@
+# This file overrides docker-compose.yml for local development
+# It ensures we build locally instead of pulling from registry
+version: '3.8'
+
+services:
+  service-registry:
+    build: 
+      context: ./server/service-registry
+      dockerfile: Dockerfile
+    
+  api-gateway:
+    build: 
+      context: ./server/api-gateway
+      dockerfile: Dockerfile
+    
+  user-service:
+    build: 
+      context: ./server/user-service
+      dockerfile: Dockerfile
+    
+  workout-plan-service:
+    build: 
+      context: ./server/workout-plan-service
+      dockerfile: Dockerfile
+    
+  genai-workout-worker:
+    build: 
+      context: ./genai
+      dockerfile: Dockerfile
+    
+  frontend:
+    build: 
+      context: ./client
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8080
