@@ -1,0 +1,164 @@
+# Add your tumid here (required for TUM cluster deployment)
+tumid:
+
+# Default values for flexfit
+global:
+  imageRegistry: "ghcr.io/aet-devops25/team-code-compass"
+  imageTag: "latest"
+  imagePullPolicy: Always
+
+# Service Registry (Eureka)
+serviceRegistry:
+  enabled: true
+  image:
+    repository: ghcr.io/aet-devops25/team-code-compass/service-registry
+    tag: latest
+    pullPolicy: Always
+  replicaCount: 1
+  service:
+    type: ClusterIP
+    port: 8761
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 256Mi
+  env: []
+
+# API Gateway
+apiGateway:
+  enabled: true
+  image:
+    repository: ghcr.io/aet-devops25/team-code-compass/api-gateway
+    tag: latest
+    pullPolicy: Always
+  replicaCount: 1
+  service:
+    type: ClusterIP
+    port: 8000
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 256Mi
+  env: []
+
+# User Service
+userService:
+  enabled: true
+  image:
+    repository: ghcr.io/aet-devops25/team-code-compass/user-service
+    tag: latest
+    pullPolicy: Always
+  replicaCount: 1
+  service:
+    type: ClusterIP
+    port: 8081
+  resources:
+    limits:
+      cpu: 500m
+      memory: 768Mi
+    requests:
+      cpu: 250m
+      memory: 512Mi
+  env: []
+
+# Workout Plan Service
+workoutPlanService:
+  enabled: true
+  image:
+    repository: ghcr.io/aet-devops25/team-code-compass/workout-plan-service
+    tag: latest
+    pullPolicy: Always
+  replicaCount: 1
+  service:
+    type: ClusterIP
+    port: 8082
+  resources:
+    limits:
+      cpu: 500m
+      memory: 768Mi
+    requests:
+      cpu: 250m
+      memory: 512Mi
+  env: []
+
+# GenAI Worker
+genaiWorker:
+  enabled: true
+  image:
+    repository: ghcr.io/aet-devops25/team-code-compass/genai-worker
+    tag: latest
+    pullPolicy: Always
+  replicaCount: 1
+  service:
+    type: ClusterIP
+    port: 8000
+  env:
+    OPEN_WEBUI_BASE_URL: "https://gpu.aet.cit.tum.de"
+    MODEL_NAME: "llama3.3:latest"
+    # CHAIR_API_KEY will be set via secret
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 500m
+      memory: 512Mi
+
+# Frontend
+frontend:
+  enabled: true
+  image:
+    repository: ghcr.io/aet-devops25/team-code-compass/frontend
+    tag: latest
+    pullPolicy: Always
+  replicaCount: 1
+  service:
+    type: ClusterIP
+    port: 80
+  env:
+    NEXT_PUBLIC_API_URL: "http://api-gateway:8000"
+  resources:
+    limits:
+      cpu: 250m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  env: []
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+  tls: true
+
+# PostgreSQL configuration
+postgres:
+  image:
+    repository: postgres
+    tag: "13-alpine"
+    pullPolicy: IfNotPresent
+  password: flexfit123  # Override in production
+  persistence:
+    size: "5Gi"
+    storageClass: ""
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 256Mi
+  env: []
+
+# Chair API Key for GenAI worker
+chairApiKey: ""  # Set via --set or values file

@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: flexfit-config
+  namespace: {{ include "flexfit.namespace" . }}
+  labels:
+    {{- include "flexfit.labels" . | nindent 4 }}
+data:
+  eureka-server: "http://service-registry:8761/eureka/"
+  postgres-host: "postgres"
+  postgres-port: "5432"
+  postgres-db: "flexfit"
+  api-gateway-url: "http://api-gateway:8000"
+  genai-service-url: "http://genai-worker:8000"
+  spring-profiles-active: "docker"

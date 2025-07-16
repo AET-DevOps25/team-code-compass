@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: service-registry
+  namespace: {{ include "flexfit.namespace" . }}
+  labels:
+    app: service-registry
+    {{- include "flexfit.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.serviceRegistry.replicaCount }}
+  selector:
+    matchLabels:
+      app: service-registry
+  template:
+    metadata:
+      labels:
+        app: service-registry
+    spec:
+      containers:
+      - name: service-registry
+        image: "{{ .Values.serviceRegistry.image.repository }}:{{ .Values.serviceRegistry.image.tag }}"
+        imagePullPolicy: {{ .Values.serviceRegistry.image.pullPolicy }}
+        ports:
+        - containerPort: 8761
+        env:
+        - name: SPRING_PROFILES_ACTIVE
+          value: "docker"
+        {{- range .Values.serviceRegistry.env }}
+        - name: {{ .name }}
+          value: "{{ .value }}"
+        {{- end }}
+        resources:
+          limits:
+            cpu: {{ .Values.serviceRegistry.resources.limits.cpu }}
+            memory: {{ .Values.serviceRegistry.resources.limits.memory }}
+          requests:
+            cpu: {{ .Values.serviceRegistry.resources.requests.cpu }}
+            memory: {{ .Values.serviceRegistry.resources.requests.memory }}
+        livenessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8761
+          initialDelaySeconds: 90
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8761
+          initialDelaySeconds: 60
+          periodSeconds: 10

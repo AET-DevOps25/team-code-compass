@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: workout-plan-service
+  namespace: {{ include "flexfit.namespace" . }}
+  labels:
+    app: workout-plan-service
+    {{- include "flexfit.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.workoutPlanService.replicaCount }}
+  selector:
+    matchLabels:
+      app: workout-plan-service
+  template:
+    metadata:
+      labels:
+        app: workout-plan-service
+    spec:
+      containers:
+      - name: workout-plan-service
+        image: "{{ .Values.workoutPlanService.image.repository }}:{{ .Values.workoutPlanService.image.tag }}"
+        imagePullPolicy: {{ .Values.workoutPlanService.image.pullPolicy }}
+        ports:
+        - containerPort: 8082
+        env:
+        - name: SPRING_PROFILES_ACTIVE
+          value: "docker"
+        - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+          value: "http://service-registry:8761/eureka/"
+        - name: SPRING_DATASOURCE_URL
+          value: "jdbc:postgresql://postgres:5432/flexfit"
+        - name: SPRING_DATASOURCE_USERNAME
+          value: "flexfit"
+        - name: SPRING_DATASOURCE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: password
+        - name: FLEXFIT_SERVICES_GENAI_SERVICE_URL
+          value: "http://genai-worker:8000"
+        {{- range .Values.workoutPlanService.env }}
+        - name: {{ .name }}
+          value: "{{ .value }}"
+        {{- end }}
+        resources:
+          limits:
+            cpu: {{ .Values.workoutPlanService.resources.limits.cpu }}
+            memory: {{ .Values.workoutPlanService.resources.limits.memory }}
+          requests:
+            cpu: {{ .Values.workoutPlanService.resources.requests.cpu }}
+            memory: {{ .Values.workoutPlanService.resources.requests.memory }}
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8082
+          initialDelaySeconds: 120
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8082
+          initialDelaySeconds: 90
+          periodSeconds: 10
