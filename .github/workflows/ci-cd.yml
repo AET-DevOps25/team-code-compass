@@ -285,7 +285,62 @@ jobs:
         run: |
           docker compose down -v
 
-  # Job 5: Build & Package (only for main branch)
+  # Job 5: Build & Push to GHCR
+  build-and-push-ghcr:
+    name: 🐳 Build & Push to GHCR
+    runs-on: ubuntu-latest
+    needs: [setup, unit-tests]
+    if: always() && (needs.setup.outputs.is_main == 'true' || needs.setup.outputs.is_development == 'true')
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        service:
+          - name: service-registry
+            context: ./server/service-registry
+          - name: api-gateway
+            context: ./server/api-gateway
+          - name: user-service
+            context: ./server/user-service
+          - name: workout-plan-service
+            context: ./server/workout-plan-service
+          - name: genai-worker
+            context: ./genai
+          - name: frontend
+            context: ./client
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔑 Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 📋 Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/${{ matrix.service.name }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: 🐳 Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.service.context }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            NEXT_PUBLIC_API_URL=http://localhost:8080
+
+  # Job 6: Build & Package (only for main branch)
   build-package:
     name: 🏗️ Build & Package
     runs-on: ubuntu-latest
@@ -331,11 +386,11 @@ jobs:
           name: deployment-artifacts-${{ github.run_number }}
           path: flexfit-deployment-*.tar.gz
 
-  # Job 6: Summary
+  # Job 7: Summary
   summary:
     name: 📊 Pipeline Summary
     runs-on: ubuntu-latest
-    needs: [setup, unit-tests, integration-tests, system-tests, build-package]
+    needs: [setup, unit-tests, integration-tests, system-tests, build-package, build-and-push-ghcr]
     if: always()
     steps:
       - name: 📊 Pipeline Results
@@ -351,6 +406,7 @@ jobs:
           echo "  🔗 Integration Tests: ${{ needs.integration-tests.result || 'skipped' }}"
           echo "  🌐 System Tests: ${{ needs.system-tests.result || 'skipped' }}"
           echo "  🏗️ Build & Package: ${{ needs.build-package.result || 'skipped' }}"
+          echo "  🐳 GHCR Push: ${{ needs.build-and-push-ghcr.result || 'skipped' }}"
           echo ""
           
           if [ "${{ needs.unit-tests.result }}" == "success" ] && [ "${{ needs.integration-tests.result }}" != "failure" ] && [ "${{ needs.system-tests.result }}" != "failure" ]; then
