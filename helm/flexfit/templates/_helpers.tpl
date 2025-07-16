@@ -52,9 +52,5 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 Create the namespace name
 */}}
 {{- define "flexfit.namespace" -}}
-{{- if .Values.tumid }}
-{{- printf "%s-devops25" .Values.tumid }}
-{{- else }}
 {{- .Release.Namespace }}
-{{- end }}
 {{- end }}
