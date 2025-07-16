@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: genai-worker
+  namespace: {{ include "flexfit.namespace" . }}
+  labels:
+    app: genai-worker
+    {{- include "flexfit.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.genaiWorker.service.type }}
+  ports:
+  - port: {{ .Values.genaiWorker.service.port }}
+    targetPort: 8000
+    protocol: TCP
+    name: http
+  selector:
+    app: genai-worker

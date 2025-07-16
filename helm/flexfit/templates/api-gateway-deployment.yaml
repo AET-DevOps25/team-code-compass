@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: {{ include "flexfit.namespace" . }}
+  labels:
+    app: api-gateway
+    {{- include "flexfit.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.apiGateway.replicaCount }}
+  selector:
+    matchLabels:
+      app: api-gateway
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+    spec:
+      containers:
+      - name: api-gateway
+        image: "{{ .Values.apiGateway.image.repository }}:{{ .Values.apiGateway.image.tag }}"
+        imagePullPolicy: {{ .Values.apiGateway.image.pullPolicy }}
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SPRING_PROFILES_ACTIVE
+          value: "docker"
+        - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+          value: "http://service-registry:8761/eureka/"
+        {{- range .Values.apiGateway.env }}
+        - name: {{ .name }}
+          value: "{{ .value }}"
+        {{- end }}
+        resources:
+          limits:
+            cpu: {{ .Values.apiGateway.resources.limits.cpu }}
+            memory: {{ .Values.apiGateway.resources.limits.memory }}
+          requests:
+            cpu: {{ .Values.apiGateway.resources.requests.cpu }}
+            memory: {{ .Values.apiGateway.resources.requests.memory }}
+        livenessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8000
+          initialDelaySeconds: 120
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8000
+          initialDelaySeconds: 90
+          periodSeconds: 10
