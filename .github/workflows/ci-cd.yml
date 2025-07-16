@@ -279,7 +279,7 @@ jobs:
     name: 🐳 Build & Push to GHCR
     runs-on: ubuntu-latest
     needs: [setup, unit-tests]
-    if: always() && (needs.setup.outputs.is_main == 'true' || needs.setup.outputs.is_development == 'true')
+    if: always() && (needs.setup.outputs.is_main == 'true' || needs.setup.outputs.is_development == 'true' || contains(github.ref, 'feature/'))
     permissions:
       contents: read
       packages: write
