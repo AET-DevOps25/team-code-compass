@@ -1,0 +1,21 @@
+[Unit]
+Description=FlexFit Application
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=ubuntu
+Group=ubuntu
+WorkingDirectory={{ app_dir }}
+Environment="IMAGE_TAG={{ image_tag }}"
+ExecStart=/usr/local/bin/docker-compose up -d
+ExecStop=/usr/local/bin/docker-compose down
+ExecReload=/usr/local/bin/docker-compose pull && /usr/local/bin/docker-compose up -d
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
