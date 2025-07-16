@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: genai-worker
+  namespace: {{ include "flexfit.namespace" . }}
+  labels:
+    app: genai-worker
+    {{- include "flexfit.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.genaiWorker.replicaCount }}
+  selector:
+    matchLabels:
+      app: genai-worker
+  template:
+    metadata:
+      labels:
+        app: genai-worker
+    spec:
+      containers:
+      - name: genai-worker
+        image: "{{ .Values.genaiWorker.image.repository }}:{{ .Values.genaiWorker.image.tag }}"
+        imagePullPolicy: {{ .Values.genaiWorker.image.pullPolicy }}
+        ports:
+        - containerPort: 8000
+        env:
+        - name: CHAIR_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: chair-api-secret
+              key: api-key
+        {{- range .Values.genaiWorker.env }}
+        - name: {{ .name }}
+          value: "{{ .value }}"
+        {{- end }}
+        resources:
+          limits:
+            cpu: {{ .Values.genaiWorker.resources.limits.cpu }}
+            memory: {{ .Values.genaiWorker.resources.limits.memory }}
+          requests:
+            cpu: {{ .Values.genaiWorker.resources.requests.cpu }}
+            memory: {{ .Values.genaiWorker.resources.requests.memory }}
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 20
+          periodSeconds: 10

@@ -1,0 +1,43 @@
+# TUM Student Cluster specific values
+# Usage: helm install flexfit . -f values-tum.yaml --namespace team-code-compass
+
+# REQUIRED: Set your TUM ID here
+tumid: "ge85zat"
+
+# Secrets
+chairApiKey: "sk-bb7ebe4b651845929b8594afb0aa11b1"
+postgres:
+  password: "flexfit_k8s_2025"  # Secure password for Kubernetes deployment
+
+# Use specific image tags from GHCR
+serviceRegistry:
+  image:
+    tag: "feature-ci-cd-ghcr-integration"  # Latest working tag with GHCR
+
+apiGateway:
+  image:
+    tag: "feature-ci-cd-ghcr-integration"
+
+userService:
+  image:
+    tag: "feature-ci-cd-ghcr-integration"
+
+workoutPlanService:
+  image:
+    tag: "feature-ci-cd-ghcr-integration"
+
+genaiWorker:
+  image:
+    tag: "feature-ci-cd-ghcr-integration"
+
+frontend:
+  image:
+    tag: "feature-ci-cd-ghcr-integration"
+
+# TUM cluster specific ingress configuration
+ingress:
+  enabled: true
+  className: "nginx"
+  tls: true
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"

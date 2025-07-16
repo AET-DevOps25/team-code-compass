@@ -1,0 +1,18 @@
+apiVersion: v2
+name: flexfit
+description: A Helm chart for FlexFit - AI-Powered Fitness Application
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - flexfit
+  - microservices
+  - spring-boot
+  - nextjs
+  - kubernetes
+home: https://github.com/AET-DevOps25/team-code-compass
+sources:
+  - https://github.com/AET-DevOps25/team-code-compass
+maintainers:
+  - name: AET DevOps Team
+    email: devops@aet.tum.de
