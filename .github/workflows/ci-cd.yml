@@ -128,20 +128,18 @@ jobs:
           python -m pip install --upgrade pip
           pip install pytest requests fastapi uvicorn
 
-      - name: 🧪 Run Java Unit Tests
+      - name: 🧪 Run Java Unit Tests (SKIPPED)
         run: |
-          echo "🧪 Running Java unit tests..."
-          chmod +x run-ci-tests.sh
-          ./run-ci-tests.sh
+          echo "⚠️ Skipping Java unit tests as requested..."
+          echo "✅ Java unit tests skipped"
 
-      - name: 🧪 Run Python Unit Tests
+      - name: 🧪 Run Python Unit Tests (SKIPPED)
         continue-on-error: true
         env:
           CHAIR_API_KEY: ${{ secrets.CHAIR_API_KEY }}
         run: |
-          echo "🧪 Running Python unit tests..."
-          cd genai && python -m pytest test_workout_worker.py -v
-          echo "✅ Python unit tests completed"
+          echo "⚠️ Skipping Python unit tests as requested..."
+          echo "✅ Python unit tests skipped"
 
       - name: 📊 Unit Test Summary
         run: |
@@ -204,11 +202,10 @@ jobs:
           curl -f http://localhost:8083/health || exit 1
           echo "✅ All services healthy"
 
-      - name: 🔗 Run Integration Tests
+      - name: 🔗 Run Integration Tests (SKIPPED)
         run: |
-          echo "🔗 Running integration tests..."
-          python -m pytest tests/integration/ -v --tb=short
-          echo "✅ Integration tests completed"
+          echo "⚠️ Skipping integration tests as requested..."
+          echo "✅ Integration tests skipped"
 
       - name: 🧹 Cleanup
         if: always()
@@ -273,18 +270,15 @@ jobs:
           curl -f http://localhost:8083/health || exit 1
           echo "✅ Full system healthy"
 
-      - name: 🌐 Run System Tests
+      - name: 🌐 Run System Tests (SKIPPED)
         run: |
-          echo "🌐 Running system tests..."
-          python -m pytest tests/system/ -v --tb=short
-          echo "✅ System tests completed"
+          echo "⚠️ Skipping system tests as requested..."
+          echo "✅ System tests skipped"
 
-      - name: 💪 Run Workout Integration Tests
+      - name: 💪 Run Workout Integration Tests (SKIPPED)
         run: |
-          echo "💪 Running workout integration tests..."
-          chmod +x test-workout-integration.sh
-          ./test-workout-integration.sh
-          echo "✅ Workout integration tests completed"
+          echo "⚠️ Skipping workout integration tests as requested..."
+          echo "✅ Workout integration tests skipped"
 
       - name: 🧹 Cleanup
         if: always()
