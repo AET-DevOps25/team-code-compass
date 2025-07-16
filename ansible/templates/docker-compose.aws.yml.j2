@@ -1,0 +1,86 @@
+version: '3.8'
+
+services:
+  service-registry:
+    image: ghcr.io/aet-devops25/team-code-compass/service-registry:{{ image_tag }}
+    ports:
+      - "8761:8761"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8761/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - flexfit-network
+
+  api-gateway:
+    image: ghcr.io/aet-devops25/team-code-compass/api-gateway:{{ image_tag }}
+    ports:
+      - "8080:8000"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-registry:8761/eureka/
+    depends_on:
+      - service-registry
+    restart: unless-stopped
+    networks:
+      - flexfit-network
+
+  user-service:
+    image: ghcr.io/aet-devops25/team-code-compass/user-service:{{ image_tag }}
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://{{ db_host }}:5432/{{ db_name }}
+      - SPRING_DATASOURCE_USERNAME={{ db_user }}
+      - SPRING_DATASOURCE_PASSWORD={{ db_password }}
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-registry:8761/eureka/
+    depends_on:
+      - service-registry
+    restart: unless-stopped
+    networks:
+      - flexfit-network
+
+  workout-plan-service:
+    image: ghcr.io/aet-devops25/team-code-compass/workout-plan-service:{{ image_tag }}
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://{{ db_host }}:5432/{{ db_name }}
+      - SPRING_DATASOURCE_USERNAME={{ db_user }}
+      - SPRING_DATASOURCE_PASSWORD={{ db_password }}
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-registry:8761/eureka/
+      - FLEXFIT_SERVICES_GENAI_SERVICE_URL=http://genai-worker:8000
+    depends_on:
+      - service-registry
+      - genai-worker
+    restart: unless-stopped
+    networks:
+      - flexfit-network
+
+  genai-worker:
+    image: ghcr.io/aet-devops25/team-code-compass/genai-worker:{{ image_tag }}
+    environment:
+      - CHAIR_API_KEY={{ chair_api_key }}
+      - MODEL_NAME=llama3.3:latest
+      - OPEN_WEBUI_BASE_URL=https://gpu.aet.cit.tum.de
+    restart: unless-stopped
+    networks:
+      - flexfit-network
+
+  frontend:
+    image: ghcr.io/aet-devops25/team-code-compass/frontend:{{ image_tag }}
+    ports:
+      - "3000:80"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://{{ ansible_host }}:8080
+    depends_on:
+      - api-gateway
+    restart: unless-stopped
+    networks:
+      - flexfit-network
+
+networks:
+  flexfit-network:
+    driver: bridge
