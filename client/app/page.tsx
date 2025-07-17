@@ -38,6 +38,7 @@ import { useAuth } from "../src/hooks/useAuth"
 import { Gender } from "../src/types/user"
 import { workoutService } from "../src/services/workoutService"
 import { SportType as WorkoutServiceSportType } from "../src/types/workout"
+import TTSAudioGenerator from "../components/TTSAudioGenerator";
 
 // Types and Enums
 enum FitnessGoal {
@@ -910,7 +911,7 @@ export default function FlexFitApp() {
                     <div className="mt-2 space-y-1">
                       {Object.entries(detailedError.error.details).map(([field, message]) => (
                         <div key={field} className="text-xs">
-                          • <span className="font-medium capitalize">{field}:</span> {message}
+                          • <span className="font-medium capitalize">{field}:</span> {String(message)}
                         </div>
                       ))}
                     </div>
@@ -1736,6 +1737,7 @@ export default function FlexFitApp() {
                   </div>
                 </CardContent>
               </Card>
+              <TTSAudioGenerator />
             </div>
           </div>
         </div>
