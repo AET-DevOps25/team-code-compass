@@ -10,6 +10,14 @@ import {
   SportType
 } from '../types/workout';
 
+// Add weekly generation options
+export interface WeeklyWorkoutGenerationOptions {
+  sportType: SportType;
+  targetDurationMinutes: number;
+  startDate?: string; // ISO date string for week start, defaults to next Monday
+  customPrompt?: string; // Optional custom prompt for LLM
+}
+
 export class WorkoutService {
   private readonly baseEndpoint = '/workout-plan-service/api/v1/plans';
 
@@ -27,6 +35,26 @@ export class WorkoutService {
 
     return apiClient.post<DailyWorkoutResponse, WorkoutPlanGenerationRequest>(
       `${this.baseEndpoint}/generate`,
+      request
+    );
+  }
+
+  /**
+   * Generate a weekly workout plan for a user
+   */
+  async generateWeeklyWorkoutPlan(options: WeeklyWorkoutGenerationOptions, userId?: string): Promise<ApiResponse<DailyWorkoutResponse[]>> {
+    // Calculate start date (next Monday if not provided)
+    const startDate = options.startDate || this.getNextMonday();
+    
+    const request: WorkoutPlanGenerationRequest = {
+      userId: userId || '', // Backend will extract from token if empty
+      dayDate: startDate,
+      focusSportType: options.sportType,
+      targetDurationMinutes: options.targetDurationMinutes
+    };
+
+    return apiClient.post<DailyWorkoutResponse[], WorkoutPlanGenerationRequest>(
+      `${this.baseEndpoint}/generate-weekly-plan`,
       request
     );
   }
@@ -152,6 +180,17 @@ export class WorkoutService {
    */
   async getServiceInfo(): Promise<ApiResponse<WorkoutInfoResponse>> {
     return apiClient.get<WorkoutInfoResponse>(`${this.baseEndpoint}/info`);
+  }
+
+  /**
+   * Get next Monday's date for weekly workout generation
+   */
+  private getNextMonday(): string {
+    const today = new Date();
+    const nextMonday = new Date(today);
+    const daysUntilMonday = (7 - today.getDay() + 1) % 7 || 7; // Get days until next Monday
+    nextMonday.setDate(today.getDate() + daysUntilMonday);
+    return nextMonday.toISOString().split('T')[0];
   }
 
   /**

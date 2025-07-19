@@ -20,17 +20,17 @@ import {
   Flame
 } from 'lucide-react';
 
-// Import types from both user and workout services
+// Import types from user types (now matches backend)
 import { 
   ExperienceLevel, 
   FitnessGoal, 
   IntensityPreference, 
-  EquipmentItem as UserEquipment 
+  SportType,
+  EquipmentItem
 } from '../types/user';
-import { 
-  SportType as WorkoutSportType, 
-  EquipmentItem as WorkoutEquipment 
-} from '../types/workout';
+
+// Import workout-specific types
+import { CompletionStatus } from '../types/workout';
 
 interface WorkoutPreferencesForm {
   // User Profile Preferences
@@ -39,8 +39,8 @@ interface WorkoutPreferencesForm {
   intensityPreference: IntensityPreference;
   
   // Workout-Specific Preferences
-  preferredSportTypes: WorkoutSportType[];
-  availableEquipment: WorkoutEquipment[];
+  preferredSportTypes: SportType[];
+  availableEquipment: EquipmentItem[];
   workoutDurationRange: string;
   workoutsPerWeek: number;
   preferredTimeOfDay: string;
@@ -51,7 +51,7 @@ interface WorkoutPreferencesForm {
   
   // Quick Settings
   quickWorkoutDuration: number;
-  defaultSportType: WorkoutSportType;
+  defaultSportType: SportType;
 }
 
 interface WorkoutPreferencesProps {
@@ -66,29 +66,29 @@ const getDisplayName = (value: string): string => {
   return value.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 };
 
-const getSportTypeIcon = (sportType: WorkoutSportType) => {
+const getSportTypeIcon = (sportType: SportType) => {
   switch (sportType) {
-    case WorkoutSportType.STRENGTH:
+    case SportType.STRENGTH:
       return <Dumbbell className="h-4 w-4" />;
-    case WorkoutSportType.HIIT:
+    case SportType.HIIT:
       return <Flame className="h-4 w-4" />;
-    case WorkoutSportType.YOGA_MOBILITY:
+    case SportType.YOGA_MOBILITY:
       return <Activity className="h-4 w-4" />;
-    case WorkoutSportType.RUNNING_INTERVALS:
+    case SportType.RUNNING_INTERVALS:
       return <TrendingUp className="h-4 w-4" />;
     default:
       return <Target className="h-4 w-4" />;
   }
 };
 
-const getEquipmentIcon = (equipment: WorkoutEquipment) => {
+const getEquipmentIcon = (equipment: EquipmentItem) => {
   switch (equipment) {
-    case WorkoutEquipment.NO_EQUIPMENT:
+    case EquipmentItem.NO_EQUIPMENT:
       return <User className="h-4 w-4" />;
-    case WorkoutEquipment.DUMBBELLS_PAIR_LIGHT:
-    case WorkoutEquipment.DUMBBELLS_PAIR_MEDIUM:
-    case WorkoutEquipment.DUMBBELLS_PAIR_HEAVY:
-    case WorkoutEquipment.ADJUSTABLE_DUMBBELLS:
+    case EquipmentItem.DUMBBELLS_PAIR_LIGHT:
+    case EquipmentItem.DUMBBELLS_PAIR_MEDIUM:
+    case EquipmentItem.DUMBBELLS_PAIR_HEAVY:
+    case EquipmentItem.ADJUSTABLE_DUMBBELLS:
       return <Dumbbell className="h-4 w-4" />;
     default:
       return <Settings className="h-4 w-4" />;
@@ -105,15 +105,15 @@ export function WorkoutPreferences({
     experienceLevel: ExperienceLevel.BEGINNER,
     fitnessGoals: [FitnessGoal.GENERAL_FITNESS],
     intensityPreference: IntensityPreference.MODERATE,
-    preferredSportTypes: [WorkoutSportType.STRENGTH],
-    availableEquipment: [WorkoutEquipment.NO_EQUIPMENT],
+    preferredSportTypes: [SportType.STRENGTH],
+    availableEquipment: [EquipmentItem.NO_EQUIPMENT],
     workoutDurationRange: '30-45 minutes',
     workoutsPerWeek: 3,
     preferredTimeOfDay: 'EVENING',
     healthNotes: '',
     dislikedExercises: [],
     quickWorkoutDuration: 30,
-    defaultSportType: WorkoutSportType.STRENGTH,
+    defaultSportType: SportType.STRENGTH,
     ...initialPreferences
   });
 
@@ -245,7 +245,7 @@ export function WorkoutPreferences({
           <div>
             <Label>Preferred Sport Types</Label>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-2">
-              {Object.values(WorkoutSportType).map(sport => (
+              {Object.values(SportType).map(sport => (
                 <div key={sport} className="flex items-center space-x-2">
                   <Checkbox 
                     id={`sport-${sport}`}
@@ -324,7 +324,7 @@ export function WorkoutPreferences({
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {Object.values(WorkoutEquipment).map(equipment => (
+            {Object.values(EquipmentItem).map(equipment => (
               <div key={equipment} className="flex items-center space-x-2">
                 <Checkbox 
                   id={`equipment-${equipment}`}
@@ -419,13 +419,13 @@ export function WorkoutPreferences({
               <Label htmlFor="defaultSportType">Default Sport Type</Label>
               <Select 
                 value={preferences.defaultSportType} 
-                onValueChange={(value: WorkoutSportType) => handleSelectChange('defaultSportType', value)}
+                onValueChange={(value: SportType) => handleSelectChange('defaultSportType', value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select default sport" />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.values(WorkoutSportType).map(sport => (
+                  {Object.values(SportType).map(sport => (
                     <SelectItem key={sport} value={sport}>
                       <div className="flex items-center space-x-2">
                         {getSportTypeIcon(sport)}

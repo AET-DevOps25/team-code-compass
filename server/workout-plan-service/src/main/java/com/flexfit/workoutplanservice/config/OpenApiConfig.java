@@ -29,11 +29,11 @@ public class OpenApiConfig {
                                 .url("https://opensource.org/licenses/MIT")))
                 .servers(List.of(
                         new Server()
-                                .url("http://localhost:8000/api/workout-plans")
-                                .description("Development server (via API Gateway)"),
-                        new Server()
                                 .url("http://localhost:8082")
                                 .description("Development server (direct access)"),
+                        new Server()
+                                .url("http://localhost:8080/workout-plan-service")
+                                .description("Development server (via API Gateway)"),
                         new Server()
                                 .url("https://api.flexfit.com")
                                 .description("Production server")

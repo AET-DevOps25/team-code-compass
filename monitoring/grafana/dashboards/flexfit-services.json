@@ -1,0 +1,90 @@
+{
+  "id": null,
+  "title": "FlexFit Services Dashboard",
+  "tags": ["flexfit"],
+  "style": "dark",
+  "timezone": "browser",
+  "panels": [
+    {
+      "id": 1,
+      "title": "Service Status",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "up",
+          "legendFormat": "{{job}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "steps": [
+              {"color": "red", "value": 0},
+              {"color": "green", "value": 1}
+            ]
+          }
+        }
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+    },
+    {
+      "id": 2,
+      "title": "HTTP Requests Rate",
+      "type": "graph",
+      "targets": [
+        {
+          "expr": "rate(http_server_requests_seconds_count[5m])",
+          "legendFormat": "{{job}} - {{method}} {{uri}}"
+        }
+      ],
+      "yAxes": [
+        {
+          "unit": "reqps"
+        }
+      ],
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+    },
+    {
+      "id": 3,
+      "title": "GenAI Requests",
+      "type": "graph",
+      "targets": [
+        {
+          "expr": "rate(genai_requests_total[5m])",
+          "legendFormat": "GenAI Requests/sec"
+        }
+      ],
+      "yAxes": [
+        {
+          "unit": "reqps"
+        }
+      ],
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+    },
+    {
+      "id": 4,
+      "title": "Workout Generations",
+      "type": "graph", 
+      "targets": [
+        {
+          "expr": "rate(genai_workout_generations_total[5m])",
+          "legendFormat": "Workout Generations/sec"
+        }
+      ],
+      "yAxes": [
+        {
+          "unit": "short"
+        }
+      ],
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+    }
+  ],
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "refresh": "30s",
+  "schemaVersion": 16,
+  "version": 1
+} 

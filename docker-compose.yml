@@ -102,7 +102,7 @@ services:
       - OPEN_WEBUI_BASE_URL=https://gpu.aet.cit.tum.de
       - CHAIR_API_KEY=${CHAIR_API_KEY}
       - MODEL_NAME=${MODEL_NAME}
-      # MOCK_MODE=true  # Disabled - using real API
+      # - MOCK_MODE=true  # Enable for faster testing
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s

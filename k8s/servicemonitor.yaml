@@ -1,0 +1,91 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: flexfit-spring-services
+  namespace: monitoring
+  labels:
+    app: flexfit
+    monitoring: "true"
+spec:
+  selector:
+    matchLabels:
+      monitoring: "true"
+  endpoints:
+  - port: http
+    path: /actuator/prometheus
+    interval: 30s
+    scrapeTimeout: 10s
+  namespaceSelector:
+    matchNames:
+    - default
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: flexfit-genai-service
+  namespace: monitoring
+  labels:
+    app: flexfit-genai
+    monitoring: "true"
+spec:
+  selector:
+    matchLabels:
+      app: flexfit-genai
+      monitoring: "true"
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+  namespaceSelector:
+    matchNames:
+    - default
+---
+# Update services to include monitoring labels
+apiVersion: v1
+kind: Service
+metadata:
+  name: user-service
+  labels:
+    app: user-service
+    monitoring: "true"
+spec:
+  selector:
+    app: user-service
+  ports:
+  - name: http
+    port: 8081
+    targetPort: 8081
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: workout-plan-service
+  labels:
+    app: workout-plan-service
+    monitoring: "true"
+spec:
+  selector:
+    app: workout-plan-service
+  ports:
+  - name: http
+    port: 8082
+    targetPort: 8082
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: flexfit-genai
+  labels:
+    app: flexfit-genai
+    monitoring: "true"
+spec:
+  selector:
+    app: flexfit-genai
+  ports:
+  - name: http
+    port: 8000
+    targetPort: 8000
+  type: ClusterIP 
