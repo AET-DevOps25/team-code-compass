@@ -4,12 +4,16 @@ import com.flexfit.workoutplanservice.dto.WorkoutPlanGenerationRequest;
 import com.flexfit.workoutplanservice.dto.DailyWorkoutResponse;
 import com.flexfit.workoutplanservice.dto.gains.GenAIResponse;
 import com.flexfit.workoutplanservice.dto.gains.GenAIDailyWorkout;
+import com.flexfit.workoutplanservice.dto.gains.GenAIWeeklyResponse;
 import com.flexfit.workoutplanservice.dto.gains.PromptContext;
+import com.flexfit.workoutplanservice.dto.gains.WeeklyPromptContext;
 import com.flexfit.workoutplanservice.dto.user.UserResponse;
 import com.flexfit.workoutplanservice.model.DailyWorkout;
 import com.flexfit.workoutplanservice.model.ScheduledExercise;
 import com.flexfit.workoutplanservice.model.enums.SportType;
+import com.flexfit.workoutplanservice.model.enums.EquipmentItem;
 import com.flexfit.workoutplanservice.repository.DailyWorkoutRepository;
+import com.flexfit.workoutplanservice.repository.ScheduledExerciseRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.*;
@@ -17,25 +21,63 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
+import java.time.LocalDate;
 import java.time.Period;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.Optional;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 @RequiredArgsConstructor
 public class WorkoutPlanService {
 
     private final DailyWorkoutRepository dailyWorkoutRepository;
+    private final ScheduledExerciseRepository scheduledExerciseRepository;
     private final WorkoutPlanMapper mapper;
+    private final Logger logger = LoggerFactory.getLogger(WorkoutPlanService.class);
 
     @Qualifier("userSvcRestTemplate")
     private final RestTemplate userSvcRestTemplate;
 
     @Qualifier("genaiSvcRestTemplate")
     private final RestTemplate genaiSvcRestTemplate;
+
+    // Helper methods for safe enum parsing
+    private SportType parseSportType(String sportTypeStr) {
+        try {
+            return SportType.valueOf(sportTypeStr);
+        } catch (IllegalArgumentException e) {
+            logger.warn("Unknown sport type '{}', defaulting to STRENGTH", sportTypeStr);
+            return SportType.STRENGTH;
+        }
+    }
+
+    private EquipmentItem parseEquipmentItem(String equipmentStr) {
+        try {
+            return EquipmentItem.valueOf(equipmentStr);
+        } catch (IllegalArgumentException e) {
+            logger.warn("Unknown equipment item '{}', defaulting to NO_EQUIPMENT", equipmentStr);
+            return EquipmentItem.NO_EQUIPMENT;
+        }
+    }
+
+    private List<SportType> parseSportTypes(List<String> sportTypes) {
+        return sportTypes.stream()
+                .map(this::parseSportType)
+                .collect(Collectors.toList());
+    }
+
+    private List<EquipmentItem> parseEquipmentItems(List<String> equipmentItems) {
+        return equipmentItems.stream()
+                .map(this::parseEquipmentItem)
+                .collect(Collectors.toList());
+    }
 
     @Transactional
     public DailyWorkoutResponse generateWorkoutPlan(WorkoutPlanGenerationRequest request, String bearerToken) {
@@ -125,10 +167,10 @@ public class WorkoutPlanService {
             exercise.setSequenceOrder(aiExercise.sequence_order());
             exercise.setExerciseName(aiExercise.exercise_name());
             exercise.setDescription(aiExercise.description());
-            exercise.setApplicableSportTypes(aiExercise.applicable_sport_types().stream().map(SportType::valueOf).collect(Collectors.toList()));
+            exercise.setApplicableSportTypes(parseSportTypes(aiExercise.applicable_sport_types()));
             exercise.setMuscleGroupsPrimary(aiExercise.muscle_groups_primary());
             exercise.setMuscleGroupsSecondary(aiExercise.muscle_groups_secondary());
-            exercise.setEquipmentNeeded(aiExercise.equipment_needed().stream().map(com.flexfit.workoutplanservice.model.enums.EquipmentItem::valueOf).collect(Collectors.toList()));
+            exercise.setEquipmentNeeded(parseEquipmentItems(aiExercise.equipment_needed()));
             exercise.setDifficulty(aiExercise.difficulty());
             exercise.setPrescribedSetsRepsDuration(aiExercise.prescribed_sets_reps_duration());
             exercise.setVoiceScriptCueText(aiExercise.voice_script_cue_text());
@@ -151,5 +193,125 @@ public class WorkoutPlanService {
         return workouts.stream()
                       .map(mapper::toDailyWorkoutResponse)
                       .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public List<DailyWorkoutResponse> generateWeeklyPlan(WorkoutPlanGenerationRequest request, String bearerToken) {
+        // Step 1: Call user-service to get the user's full profile
+        UserResponse user = getUserProfile(request.getUserId(), bearerToken);
+        if (user == null) {
+            throw new IllegalStateException("User not found or unable to fetch profile.");
+        }
+
+        // Step 2: Fetch last 7 days of workouts
+        LocalDate today = LocalDate.now();
+        LocalDate sevenDaysAgo = today.minusDays(7);
+        List<DailyWorkout> last7DaysWorkouts = dailyWorkoutRepository.findByUserIdAndDayDateBetween(
+            request.getUserId(), sevenDaysAgo, today
+        );
+
+        // Step 3: Build the weekly prompt context
+        WeeklyPromptContext promptContext = buildWeeklyPromptContext(user, request, last7DaysWorkouts);
+
+        // Step 4: Call the Python genai-service for weekly generation
+        GenAIWeeklyResponse genAIResponse = callGenAIWorkerForWeekly(promptContext, bearerToken);
+        if (genAIResponse == null || genAIResponse.workouts() == null || genAIResponse.workouts().isEmpty()) {
+            throw new IllegalStateException("Failed to generate weekly workout plan from GenAI service.");
+        }
+
+        // Step 5: Create and save all 7 workout entities from the GenAI response
+        List<DailyWorkout> savedWorkouts = persistWeeklyWorkoutPlan(request, genAIResponse);
+
+        // Step 6: Map the saved entities to response DTOs and return
+        return savedWorkouts.stream()
+                          .map(mapper::toDailyWorkoutResponse)
+                          .collect(Collectors.toList());
+    }
+
+    private WeeklyPromptContext buildWeeklyPromptContext(UserResponse user, WorkoutPlanGenerationRequest request, List<DailyWorkout> last7Days) {
+        int age = Period.between(user.dateOfBirth(), LocalDate.now()).getYears();
+        
+        Map<String, Object> userProfileMap = Map.of(
+            "user_id", user.id().toString(),
+            "date_of_birth", user.dateOfBirth().toString(),
+            "height_cm", user.heightCm() != null ? user.heightCm() : 180,
+            "weight_kg", user.weightKg() != null ? user.weightKg() : 75,
+            "gender", user.gender() != null ? user.gender() : "UNKNOWN"
+        );
+        
+        // Transform last 7 days workouts into the expected format
+        List<Map<String, Object>> last7DaysExercises = new ArrayList<>();
+        for (DailyWorkout workout : last7Days) {
+            Map<String, Object> dayData = new HashMap<>();
+            dayData.put("day_date", workout.getDayDate().toString());
+            dayData.put("sport_type", workout.getFocusSportTypeForTheDay().toString());
+            
+            List<String> exerciseNames = workout.getScheduledExercises().stream()
+                .map(ScheduledExercise::getExerciseName)
+                .collect(Collectors.toList());
+            dayData.put("exercises", exerciseNames);
+            
+            List<String> muscleGroups = workout.getScheduledExercises().stream()
+                .flatMap(ex -> ex.getMuscleGroupsPrimary().stream())
+                .distinct()
+                .collect(Collectors.toList());
+            dayData.put("muscle_groups_worked", muscleGroups);
+            
+            last7DaysExercises.add(dayData);
+        }
+        
+        String textPrompt = request.getTextPrompt() != null ? request.getTextPrompt() : 
+            "Generate a balanced 7-day workout plan with proper progression and recovery";
+
+        return new WeeklyPromptContext(userProfileMap, user.preferences(), textPrompt, last7DaysExercises);
+    }
+
+    private GenAIWeeklyResponse callGenAIWorkerForWeekly(WeeklyPromptContext context, String bearerToken) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", bearerToken);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<WeeklyPromptContext> entity = new HttpEntity<>(context, headers);
+        
+        try {
+            ResponseEntity<GenAIWeeklyResponse> response = genaiSvcRestTemplate.exchange(
+                "/generate-weekly", HttpMethod.POST, entity, GenAIWeeklyResponse.class);
+            return response.getBody();
+        } catch(Exception e) {
+            System.err.println("Error calling GenAI worker for weekly plan: " + e.getMessage());
+            return null;
+        }
+    }
+
+    private List<DailyWorkout> persistWeeklyWorkoutPlan(WorkoutPlanGenerationRequest request, GenAIWeeklyResponse genAIResponse) {
+        List<DailyWorkout> savedWorkouts = new ArrayList<>();
+        
+        for (GenAIDailyWorkout aiWorkout : genAIResponse.workouts()) {
+            DailyWorkout dailyWorkout = new DailyWorkout();
+            dailyWorkout.setUserId(request.getUserId());
+            dailyWorkout.setDayDate(LocalDate.parse(aiWorkout.day_date()));
+            dailyWorkout.setFocusSportTypeForTheDay(parseSportType(aiWorkout.focus_sport_type_for_the_day()));
+            dailyWorkout.setMarkdownContent(aiWorkout.markdown_content());
+            
+            List<ScheduledExercise> exercises = aiWorkout.scheduled_exercises().stream().map(aiExercise -> {
+                ScheduledExercise exercise = new ScheduledExercise();
+                exercise.setSequenceOrder(aiExercise.sequence_order());
+                exercise.setExerciseName(aiExercise.exercise_name());
+                exercise.setDescription(aiExercise.description());
+                exercise.setApplicableSportTypes(parseSportTypes(aiExercise.applicable_sport_types()));
+                exercise.setMuscleGroupsPrimary(aiExercise.muscle_groups_primary());
+                exercise.setMuscleGroupsSecondary(aiExercise.muscle_groups_secondary());
+                exercise.setEquipmentNeeded(parseEquipmentItems(aiExercise.equipment_needed()));
+                exercise.setDifficulty(aiExercise.difficulty());
+                exercise.setPrescribedSetsRepsDuration(aiExercise.prescribed_sets_reps_duration());
+                exercise.setVoiceScriptCueText(aiExercise.voice_script_cue_text());
+                exercise.setVideoUrl(aiExercise.video_url());
+                return exercise;
+            }).collect(Collectors.toList());
+            
+            dailyWorkout.setScheduledExercises(exercises);
+            savedWorkouts.add(dailyWorkoutRepository.save(dailyWorkout));
+        }
+
+        return savedWorkouts;
     }
 }
