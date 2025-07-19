@@ -16,6 +16,7 @@ spring:
 
 server:
   port: ${PORT:8081}
+  forward-headers-strategy: framework
 
 eureka:
   client:
@@ -36,8 +37,13 @@ management:
 springdoc:
   api-docs:
     path: /v3/api-docs
+    enabled: true
   swagger-ui:
     path: /swagger-ui.html
+    disable-swagger-default-url: true
     config-url: /v3/api-docs/swagger-config
     url: /v3/api-docs
-    disable-swagger-default-url: true 
+    try-it-out-enabled: true
+    filter: true
+  show-actuator: false
+  use-fqn: true 
