@@ -1,13 +1,16 @@
 import os
 import requests
 import json
-from fastapi import FastAPI, HTTPException, Header
+import time
+from fastapi import FastAPI, HTTPException, Header, Request
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from typing import List, Optional, Any
 from langchain.llms.base import LLM
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
 from langchain.callbacks.manager import CallbackManagerForLLMRun
+from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
 
 # --- Environment and API Configuration ---
 # Open WebUI API Configuration
@@ -109,12 +112,40 @@ class OpenWebUILLM(LLM):
             print(f"Failed to parse Open WebUI response: {e}")
             raise Exception(f"Failed to parse Open WebUI response. Check model output format.")
 
+# --- Prometheus Metrics Setup ---
+REQUEST_COUNT = Counter(
+    'genai_requests_total', 
+    'Total number of requests to GenAI service',
+    ['method', 'endpoint', 'status']
+)
+REQUEST_DURATION = Histogram(
+    'genai_request_duration_seconds',
+    'Duration of GenAI requests in seconds',
+    ['method', 'endpoint']
+)
+GENERATION_COUNT = Counter(
+    'genai_workout_generations_total',
+    'Total number of workout generations',
+    ['generation_type', 'status']
+)
+GENERATION_DURATION = Histogram(
+    'genai_generation_duration_seconds',
+    'Duration of workout generation in seconds',
+    ['generation_type']
+)
+
 # --- FastAPI Application Setup ---
 app = FastAPI(
     title="FlexFit GenAI Workout Worker",
     description="A service to generate personalized workout plans using Open WebUI.",
     version="1.0.0"
 )
+
+# Prometheus metrics endpoint
+@app.get("/metrics")
+async def get_metrics():
+    """Prometheus metrics endpoint"""
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 @app.on_event("startup")
 async def startup_event():
