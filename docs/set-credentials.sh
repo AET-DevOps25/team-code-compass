@@ -1,0 +1,8 @@
+#!/bin/bash
+
+# Set JWT token and user ID for testing
+export JWT_TOKEN="eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0dXNlcjQ1NkBleGFtcGxlLmNvbSIsInVzZXJJZCI6ImUxY2VjZGY3LTZlY2MtNDg0ZS1iY2YxLTM4Y2U5ZjZiMTY5NSIsInVzZXJuYW1lIjoidGVzdHVzZXI0NTYiLCJpYXQiOjE3NTI3Nzk1NzMsImV4cCI6MTc1Mjg2NTk3M30.EFCbDSu53sHCY7R419wpo2lhsDQZIFACLA35yKwxvaM"
+export USER_ID="e1cecdf7-6ecc-484e-bcf1-38ce9f6b1695"
+
+echo "JWT_TOKEN and USER_ID have been set"
+echo "USER_ID: $USER_ID"

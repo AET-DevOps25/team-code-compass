@@ -1,0 +1,139 @@
+weekly_prompt_template_str = """
+Create a comprehensive 7-day workout plan. User context: {context}
+
+Rules:
+- Generate 7 consecutive days of workouts
+- Vary sport types: STRENGTH, HIIT, YOGA_MOBILITY, RUNNING_INTERVALS, REST
+- Use valid equipment: NO_EQUIPMENT, DUMBBELLS_PAIR_MEDIUM, BARBELL_WITH_PLATES, BENCH_FLAT, YOGA_MAT, PULL_UP_BAR, etc.
+- Include 1-2 REST days for recovery
+- 2-6 exercises per workout (0 exercises for REST days)
+- Difficulty: Beginner, Intermediate, Advanced
+
+IMPORTANT: For each day, create DETAILED markdown_content following this exact format:
+
+For WORKOUT days:
+```
+# SPORT_TYPE - Workout Name
+Date: YYYY-MM-DD
+
+## Workout Overview
+- **Duration**: 45-60 minutes
+- **Focus**: Primary muscle groups
+- **Sport Type**: SPORT_TYPE
+
+## Warm-up (10 minutes)
+- Dynamic stretching
+- Light cardio movements
+
+## Main Workout
+
+### 1. Exercise Name
+- **Sets/Reps**: 3 sets x 12 reps
+- **Target Muscles**: Primary muscles
+- **Equipment**: Equipment needed
+- **Coaching Tip**: Form and technique cue
+
+### 2. Exercise Name
+- **Sets/Reps**: 3 sets x 10 reps
+- **Target Muscles**: Primary muscles
+- **Equipment**: Equipment needed
+- **Coaching Tip**: Form and technique cue
+
+## Cool Down (10 minutes)
+- Static stretching
+- Deep breathing exercises
+
+## Coach's Notes
+Focus on form and controlled movements. Adjust weights as needed to maintain proper technique throughout all sets.
+```
+
+For REST days:
+```
+# REST - Rest Day Name
+Date: YYYY-MM-DD
+
+## Rest Day Overview
+- **Duration**: Full day recovery
+- **Focus**: Recovery and regeneration
+- **Sport Type**: REST
+
+## Recommendations
+- Light walking or gentle stretching
+- Focus on hydration and nutrition
+- Get adequate sleep for recovery
+
+## Optional Light Activities
+- 10-15 minutes of gentle stretching
+- Light walk or leisurely bike ride
+- Meditation or breathing exercises
+
+## Coach's Notes
+Rest days are crucial for muscle recovery and adaptation. Listen to your body and avoid intense training.
+```
+
+JSON format:
+{{
+  "workouts": [
+    {{
+      "day_date": "YYYY-MM-DD",
+      "focus_sport_type_for_the_day": "SPORT_TYPE",
+      "scheduled_exercises": [
+        {{
+          "sequence_order": 1,
+          "exercise_name": "Exercise Name",
+          "description": "Brief description",
+          "applicable_sport_types": ["SPORT_TYPE"],
+          "muscle_groups_primary": ["Primary"],
+          "muscle_groups_secondary": ["Secondary"],
+          "equipment_needed": ["EQUIPMENT_ENUM"],
+          "difficulty": "Intermediate",
+          "prescribed_sets_reps_duration": "3 sets x 12 reps",
+          "voice_script_cue_text": "Form cue",
+          "video_url": null
+        }}
+      ],
+      "markdown_content": "DETAILED markdown content following the format above"
+    }}
+  ]
+}}
+"""
+
+
+
+weekly_prompt_template_str = """
+Create a 7-day workout plan. User context: {context}
+
+Rules:
+- Generate 7 consecutive days of workouts
+- Vary sport types: STRENGTH, HIIT, YOGA_MOBILITY, RUNNING_INTERVALS, REST
+- Use valid equipment: NO_EQUIPMENT, DUMBBELLS_PAIR_MEDIUM, BARBELL_WITH_PLATES, BENCH_FLAT, YOGA_MAT, etc.
+- Include 1-2 rest/light days
+- 3-6 exercises per workout
+- Difficulty: Beginner, Intermediate, Advanced
+
+JSON format:
+{{
+  "workouts": [
+    {{
+      "day_date": "YYYY-MM-DD",
+      "focus_sport_type_for_the_day": "SPORT_TYPE",
+      "scheduled_exercises": [
+        {{
+          "sequence_order": 1,
+          "exercise_name": "Exercise Name",
+          "description": "Brief description",
+          "applicable_sport_types": ["SPORT_TYPE"],
+          "muscle_groups_primary": ["Primary"],
+          "muscle_groups_secondary": ["Secondary"],
+          "equipment_needed": ["EQUIPMENT_ENUM"],
+          "difficulty": "Intermediate",
+          "prescribed_sets_reps_duration": "3 sets x 12 reps",
+          "voice_script_cue_text": "Form cue",
+          "video_url": null
+        }}
+      ],
+      "markdown_content": "# Day X Workout\\n\\nExercises and instructions."
+    }}
+  ]
+}}
+"""

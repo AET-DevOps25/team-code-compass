@@ -1,0 +1,23 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # FlexFit Spring Boot Services - using health endpoints for now
+  - job_name: 'spring-boot-health'
+    static_configs:
+      - targets: ['host.docker.internal:8081', 'host.docker.internal:8082']
+    metrics_path: '/actuator/health'
+    scrape_interval: 30s
+
+  # For demo: Let's test our working metrics endpoint in different format
+  - job_name: 'spring-boot-metrics-json'
+    static_configs:
+      - targets: ['host.docker.internal:8082']
+    metrics_path: '/actuator/metrics'
+    scrape_interval: 30s 
