@@ -5,5 +5,6 @@ public enum SportType {
     STRENGTH,
     HIIT,
     YOGA_MOBILITY,
-    RUNNING_INTERVALS
+    RUNNING_INTERVALS,
+    REST
 }

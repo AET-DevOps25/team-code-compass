@@ -61,6 +61,16 @@ public class WorkoutPlanController {
         return ResponseEntity.ok(workouts);
     }
 
+    @PostMapping("/generate-weekly-plan")
+    @SecurityRequirement(name = "bearerAuth")
+    public ResponseEntity<List<DailyWorkoutResponse>> generateWeeklyPlan(
+            @Valid @RequestBody WorkoutPlanGenerationRequest request,
+            @RequestHeader("Authorization") String bearerToken) {
+        
+        List<DailyWorkoutResponse> weeklyPlan = workoutPlanService.generateWeeklyPlan(request, bearerToken);
+        return ResponseEntity.ok(weeklyPlan);
+    }
+
     @GetMapping("/health")
     public Map<String, String> health() {
         return Map.of(
