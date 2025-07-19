@@ -17,11 +17,15 @@ services:
     build: 
       context: ./server/user-service
       dockerfile: Dockerfile
+    ports:
+      - "8081:8081"
     
   workout-plan-service:
     build: 
       context: ./server/workout-plan-service
       dockerfile: Dockerfile
+    ports:
+      - "8082:8082"
     
   genai-workout-worker:
     build: 
