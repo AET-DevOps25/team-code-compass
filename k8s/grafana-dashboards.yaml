@@ -1,0 +1,172 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: flexfit-dashboards
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  flexfit-spring-services.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "FlexFit Spring Services",
+        "tags": ["flexfit", "spring-boot"],
+        "style": "dark",
+        "timezone": "browser",
+        "panels": [
+          {
+            "title": "Request Rate",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "sum(rate(http_server_requests_seconds_count{application=~\"user-service|workout-plan-service\"}[5m])) by (application)",
+                "legendFormat": "{{application}}"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "reqps"
+              }
+            },
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+          },
+          {
+            "title": "Response Time",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{application=~\"user-service|workout-plan-service\"}[5m])) by (le, application))",
+                "legendFormat": "{{application}} 95th percentile"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "s"
+              }
+            },
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+          },
+          {
+            "title": "Error Rate",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "sum(rate(http_server_requests_seconds_count{application=~\"user-service|workout-plan-service\",status=~\"4..|5..\"}[5m])) by (application) / sum(rate(http_server_requests_seconds_count{application=~\"user-service|workout-plan-service\"}[5m])) by (application)",
+                "legendFormat": "{{application}}"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "percentunit"
+              }
+            },
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+          },
+          {
+            "title": "JVM Memory Usage",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "jvm_memory_used_bytes{application=~\"user-service|workout-plan-service\"} / jvm_memory_max_bytes{application=~\"user-service|workout-plan-service\"}",
+                "legendFormat": "{{application}} - {{area}}"
+              }
+            ],
+            "yAxes": [
+              {
+                "unit": "percentunit",
+                "max": 1
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+          }
+        ],
+        "time": {
+          "from": "now-1h",
+          "to": "now"
+        },
+        "refresh": "30s"
+      }
+    }
+  
+  flexfit-genai-service.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "FlexFit GenAI Service",
+        "tags": ["flexfit", "genai", "python"],
+        "style": "dark",
+        "timezone": "browser",
+        "panels": [
+          {
+            "title": "GenAI Request Rate",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "sum(rate(genai_requests_total[5m]))",
+                "legendFormat": "Requests/sec"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "reqps"
+              }
+            },
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+          },
+          {
+            "title": "GenAI Request Duration",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, sum(rate(genai_request_duration_seconds_bucket[5m])) by (le))",
+                "legendFormat": "95th percentile"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "s"
+              }
+            },
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+          },
+          {
+            "title": "Workout Generation Count",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "sum(rate(genai_workout_generations_total[5m])) by (generation_type)",
+                "legendFormat": "{{generation_type}}"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "short"
+              }
+            },
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+          },
+          {
+            "title": "Generation Success Rate",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "sum(rate(genai_workout_generations_total{status=\"success\"}[5m])) / sum(rate(genai_workout_generations_total[5m]))",
+                "legendFormat": "Success Rate"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "percentunit"
+              }
+            },
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+          }
+        ],
+        "time": {
+          "from": "now-1h",
+          "to": "now"
+        },
+        "refresh": "30s"
+      }
+    } 
