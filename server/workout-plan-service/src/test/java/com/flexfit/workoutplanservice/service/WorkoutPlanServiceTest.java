@@ -1,6 +1,7 @@
 package com.flexfit.workoutplanservice.service;
 
 import com.flexfit.workoutplanservice.repository.DailyWorkoutRepository;
+import com.flexfit.workoutplanservice.repository.ScheduledExerciseRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -13,6 +14,9 @@ class WorkoutPlanServiceTest {
 
     @Mock
     private DailyWorkoutRepository dailyWorkoutRepository;
+
+    @Mock
+    private ScheduledExerciseRepository scheduledExerciseRepository;
 
     @Mock
     private WorkoutPlanMapper mapper;
@@ -30,6 +34,7 @@ class WorkoutPlanServiceTest {
         MockitoAnnotations.openMocks(this);
         workoutPlanService = new WorkoutPlanService(
             dailyWorkoutRepository,
+            scheduledExerciseRepository,
             mapper,
             userSvcRestTemplate,
             genaiSvcRestTemplate

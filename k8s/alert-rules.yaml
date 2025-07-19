@@ -1,0 +1,94 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: flexfit-alerts
+  namespace: monitoring
+  labels:
+    app: flexfit
+    prometheus: kube-prometheus
+    role: alert-rules
+spec:
+  groups:
+  - name: flexfit.rules
+    rules:
+    # Spring Boot Services Alerts
+    - alert: SpringServiceDown
+      expr: up{job=~".*user-service.*|.*workout-plan-service.*"} == 0
+      for: 1m
+      labels:
+        severity: critical
+        service: "{{ $labels.job }}"
+      annotations:
+        summary: "FlexFit Spring service is down"
+        description: "Spring service {{ $labels.job }} has been down for more than 1 minute."
+    
+    - alert: HighErrorRate
+      expr: sum(rate(http_server_requests_seconds_count{application=~"user-service|workout-plan-service",status=~"4..|5.."}[5m])) by (application) / sum(rate(http_server_requests_seconds_count{application=~"user-service|workout-plan-service"}[5m])) by (application) > 0.1
+      for: 2m
+      labels:
+        severity: warning
+        service: "{{ $labels.application }}"
+      annotations:
+        summary: "High error rate detected"
+        description: "Service {{ $labels.application }} has error rate above 10% for more than 2 minutes."
+    
+    - alert: HighResponseTime
+      expr: histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{application=~"user-service|workout-plan-service"}[5m])) by (le, application)) > 2
+      for: 5m
+      labels:
+        severity: warning
+        service: "{{ $labels.application }}"
+      annotations:
+        summary: "High response time detected"
+        description: "Service {{ $labels.application }} 95th percentile response time is above 2 seconds for more than 5 minutes."
+    
+    - alert: HighMemoryUsage
+      expr: jvm_memory_used_bytes{application=~"user-service|workout-plan-service"} / jvm_memory_max_bytes{application=~"user-service|workout-plan-service"} > 0.85
+      for: 5m
+      labels:
+        severity: warning
+        service: "{{ $labels.application }}"
+      annotations:
+        summary: "High JVM memory usage"
+        description: "Service {{ $labels.application }} JVM memory usage is above 85% for more than 5 minutes."
+    
+    # GenAI Service Alerts
+    - alert: GenAIServiceDown
+      expr: up{job=~".*flexfit-genai.*"} == 0
+      for: 1m
+      labels:
+        severity: critical
+        service: genai
+      annotations:
+        summary: "FlexFit GenAI service is down"
+        description: "GenAI service has been down for more than 1 minute."
+    
+    - alert: GenAIHighErrorRate
+      expr: sum(rate(genai_requests_total{status!="200"}[5m])) / sum(rate(genai_requests_total[5m])) > 0.1
+      for: 2m
+      labels:
+        severity: warning
+        service: genai
+      annotations:
+        summary: "GenAI service high error rate"
+        description: "GenAI service has error rate above 10% for more than 2 minutes."
+    
+    - alert: GenAISlowGeneration
+      expr: histogram_quantile(0.95, sum(rate(genai_generation_duration_seconds_bucket[5m])) by (le)) > 30
+      for: 3m
+      labels:
+        severity: warning
+        service: genai
+      annotations:
+        summary: "GenAI slow workout generation"
+        description: "GenAI workout generation is taking longer than 30 seconds (95th percentile) for more than 3 minutes."
+    
+    - alert: NoWorkoutGenerations
+      expr: sum(rate(genai_workout_generations_total[10m])) == 0
+      for: 5m
+      labels:
+        severity: warning
+        service: genai
+      annotations:
+        summary: "No workout generations"
+        description: "No workout generations have been processed in the last 10 minutes." 

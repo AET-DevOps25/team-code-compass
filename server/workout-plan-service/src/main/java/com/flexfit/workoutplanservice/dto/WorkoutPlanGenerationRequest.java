@@ -21,5 +21,7 @@ public class WorkoutPlanGenerationRequest {
 
     @NotNull
     private Integer targetDurationMinutes;
+    
+    private String textPrompt;
 }
 
