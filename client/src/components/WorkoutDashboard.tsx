@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useWorkout, useWorkoutGeneration } from '../hooks/useWorkout';
 import { SportType } from '../types/workout';
+import { workoutService, WeeklyWorkoutGenerationOptions } from '../services/workoutService';
 
 export function WorkoutDashboard() {
   const {
@@ -22,6 +23,9 @@ export function WorkoutDashboard() {
 
   const [selectedSport, setSelectedSport] = useState<SportType>(SportType.STRENGTH);
   const [duration, setDuration] = useState(30);
+  const [customPrompt, setCustomPrompt] = useState('');
+  const [isGeneratingWeekly, setIsGeneratingWeekly] = useState(false);
+  const [weeklyWorkouts, setWeeklyWorkouts] = useState<any[]>([]);
 
   const handleGenerateWorkout = async () => {
     clearGenerationError();
@@ -36,6 +40,32 @@ export function WorkoutDashboard() {
     }
   };
 
+  const handleGenerateWeeklyWorkout = async () => {
+    clearGenerationError();
+    setIsGeneratingWeekly(true);
+    
+    try {
+      const weeklyOptions: WeeklyWorkoutGenerationOptions = {
+        sportType: selectedSport,
+        targetDurationMinutes: duration,
+        customPrompt: customPrompt.trim() || undefined
+      };
+      
+      const response = await workoutService.generateWeeklyWorkoutPlan(weeklyOptions);
+      
+      if (response.data) {
+        setWeeklyWorkouts(response.data);
+        console.log('Weekly workouts generated:', response.data);
+      } else if (response.error) {
+        console.error('Weekly generation error:', response.error);
+      }
+    } catch (error) {
+      console.error('Failed to generate weekly workout:', error);
+    } finally {
+      setIsGeneratingWeekly(false);
+    }
+  };
+
   const handleRefreshWorkout = async () => {
     clearError();
     await getTodaysWorkout();
@@ -47,7 +77,7 @@ export function WorkoutDashboard() {
   };
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div className="p-6 max-w-6xl mx-auto">
       <h1 className="text-3xl font-bold mb-6">Workout Dashboard</h1>
       
       {/* Error Display */}
@@ -81,8 +111,10 @@ export function WorkoutDashboard() {
 
       {/* Workout Generation Section */}
       <div className="bg-white shadow-md rounded-lg p-6 mb-6">
-        <h2 className="text-xl font-semibold mb-4">Generate New Workout</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+        <h2 className="text-xl font-semibold mb-4">Generate Workouts</h2>
+        
+        {/* Basic Settings */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Sport Type
@@ -114,18 +146,70 @@ export function WorkoutDashboard() {
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
+        </div>
 
-          <div className="flex items-end">
-            <button
-              onClick={handleGenerateWorkout}
-              disabled={isGenerating}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-medium py-2 px-4 rounded-md transition-colors"
-            >
-              {isGenerating ? 'Generating...' : 'Generate Workout'}
-            </button>
-          </div>
+        {/* Custom Prompt for LLM */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Custom Instructions (Optional)
+          </label>
+          <textarea
+            value={customPrompt}
+            onChange={(e) => setCustomPrompt(e.target.value)}
+            placeholder="Enter any specific requirements or preferences for your workout..."
+            rows={3}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+          />
+        </div>
+
+        {/* Generation Buttons */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <button
+            onClick={handleGenerateWorkout}
+            disabled={isGenerating}
+            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-medium py-3 px-4 rounded-md transition-colors"
+          >
+            {isGenerating ? 'Generating...' : 'Generate Daily Workout'}
+          </button>
+          
+          <button
+            onClick={handleGenerateWeeklyWorkout}
+            disabled={isGeneratingWeekly}
+            className="w-full bg-green-600 hover:bg-green-700 disabled:bg-green-300 text-white font-medium py-3 px-4 rounded-md transition-colors"
+          >
+            {isGeneratingWeekly ? 'Generating Weekly...' : 'Generate Weekly Plan'}
+          </button>
         </div>
       </div>
+
+      {/* Weekly Workouts Display */}
+      {weeklyWorkouts.length > 0 && (
+        <div className="bg-white shadow-md rounded-lg p-6 mb-6">
+          <h2 className="text-xl font-semibold mb-4">Weekly Workout Plan</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {weeklyWorkouts.map((workout, index) => (
+              <div key={workout.id || index} className="border border-gray-200 rounded-lg p-4">
+                <h3 className="font-semibold text-lg mb-2">
+                  Day {index + 1}: {workout.focusSportTypeForTheDay?.replace('_', ' ')}
+                </h3>
+                <p className="text-sm text-gray-600 mb-2">
+                  Date: {new Date(workout.dayDate).toLocaleDateString()}
+                </p>
+                <p className="text-sm text-gray-700 mb-3">
+                  {workout.scheduledExercises?.length || 0} exercises
+                </p>
+                <div className="text-xs text-gray-500 max-h-20 overflow-y-auto">
+                  {workout.markdownContent && (
+                    <div dangerouslySetInnerHTML={{ 
+                      __html: workout.markdownContent.substring(0, 200) + '...' 
+                    }} />
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Today's Workout Section */}
       <div className="bg-white shadow-md rounded-lg p-6 mb-6">
