@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useWorkout, useWorkoutGeneration } from '../hooks/useWorkout';
-import { SportType } from '../types/workout';
+import { SportType, CompletionStatus } from '../types/workout';
 import { workoutService, WeeklyWorkoutGenerationOptions } from '../services/workoutService';
 
 export function WorkoutDashboard() {
@@ -74,6 +74,44 @@ export function WorkoutDashboard() {
   const handleViewHistory = async () => {
     clearError();
     await getWorkoutHistory();
+  };
+
+  const handleCompleteExercise = async (exerciseId: string) => {
+    try {
+      console.log('Completing exercise:', exerciseId);
+      
+      const response = await workoutService.completeExercise(exerciseId);
+      
+      if (response.data) {
+        console.log('Exercise completed successfully:', response.data.message);
+        // Refresh the workout to update the UI with new completion status
+        await getTodaysWorkout();
+      } else if (response.error) {
+        console.error('Failed to complete exercise:', response.error);
+      }
+    } catch (error) {
+      console.error('Failed to complete exercise:', error);
+    }
+  };
+
+  const handleCompleteWorkout = async () => {
+    if (!currentWorkout) return;
+    
+    try {
+      console.log('Completing workout:', currentWorkout.id);
+      
+      const response = await workoutService.completeWorkout(currentWorkout.id);
+      
+      if (response.data) {
+        console.log('Workout completed successfully:', response.data);
+        // Refresh the workout to update the UI with new completion status
+        await getTodaysWorkout();
+      } else if (response.error) {
+        console.error('Failed to complete workout:', response.error);
+      }
+    } catch (error) {
+      console.error('Failed to complete workout:', error);
+    }
   };
 
   return (
@@ -231,13 +269,30 @@ export function WorkoutDashboard() {
           </div>
         ) : hasWorkoutForToday && currentWorkout ? (
           <div>
-            <div className="mb-4">
-              <span className="inline-block bg-blue-100 text-blue-800 text-sm font-medium px-2.5 py-0.5 rounded">
-                {currentWorkout.focusSportTypeForTheDay.replace('_', ' ')}
-              </span>
-              <span className="inline-block bg-gray-100 text-gray-800 text-sm font-medium px-2.5 py-0.5 rounded ml-2">
-                {currentWorkout.completionStatus}
-              </span>
+            <div className="mb-4 flex justify-between items-center">
+              <div>
+                <span className="inline-block bg-blue-100 text-blue-800 text-sm font-medium px-2.5 py-0.5 rounded">
+                  {currentWorkout.focusSportTypeForTheDay.replace('_', ' ')}
+                </span>
+                <span className={`inline-block text-sm font-medium px-2.5 py-0.5 rounded ml-2 ${
+                  currentWorkout.completionStatus === 'COMPLETED' 
+                    ? 'bg-green-100 text-green-800' 
+                    : currentWorkout.completionStatus === 'IN_PROGRESS'
+                    ? 'bg-yellow-100 text-yellow-800'
+                    : 'bg-gray-100 text-gray-800'
+                }`}>
+                  {currentWorkout.completionStatus?.replace('_', ' ') || 'PENDING'}
+                </span>
+              </div>
+              
+              {currentWorkout.completionStatus !== 'COMPLETED' && (
+                <button
+                  onClick={handleCompleteWorkout}
+                  className="bg-green-600 hover:bg-green-700 text-white text-sm font-medium py-2 px-4 rounded-md transition-colors"
+                >
+                  ✓ Complete Workout
+                </button>
+              )}
             </div>
 
             {currentWorkout.markdownContent && (
@@ -254,15 +309,46 @@ export function WorkoutDashboard() {
                 <h3 className="font-medium mb-3">Exercises ({currentWorkout.scheduledExercises.length}):</h3>
                 <div className="space-y-3">
                   {currentWorkout.scheduledExercises.map((exercise, index) => (
-                    <div key={exercise.id || index} className="border-l-4 border-blue-500 pl-4">
-                      <h4 className="font-medium">{exercise.sequenceOrder}. {exercise.exerciseName}</h4>
-                      <p className="text-sm text-gray-600 mb-1">{exercise.description}</p>
-                      <p className="text-sm text-blue-600">{exercise.prescribedSetsRepsDuration}</p>
-                      {exercise.difficulty && (
-                        <span className="inline-block bg-yellow-100 text-yellow-800 text-xs font-medium px-2 py-1 rounded mt-1">
-                          {exercise.difficulty}
-                        </span>
-                      )}
+                    <div key={exercise.id || index} className={`border-l-4 pl-4 p-3 rounded-r-md ${
+                      exercise.completionStatus === 'COMPLETED' 
+                        ? 'border-green-500 bg-green-50' 
+                        : exercise.completionStatus === 'IN_PROGRESS'
+                        ? 'border-yellow-500 bg-yellow-50'
+                        : 'border-blue-500 bg-white'
+                    }`}>
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <h4 className="font-medium">{exercise.sequenceOrder}. {exercise.exerciseName}</h4>
+                          <p className="text-sm text-gray-600 mb-1">{exercise.description}</p>
+                          <p className="text-sm text-blue-600">{exercise.prescribedSetsRepsDuration}</p>
+                          <div className="flex items-center gap-2 mt-2">
+                            {exercise.difficulty && (
+                              <span className="inline-block bg-yellow-100 text-yellow-800 text-xs font-medium px-2 py-1 rounded">
+                                {exercise.difficulty}
+                              </span>
+                            )}
+                            <span className={`inline-block text-xs font-medium px-2 py-1 rounded ${
+                              exercise.completionStatus === 'COMPLETED'
+                                ? 'bg-green-100 text-green-800'
+                                : exercise.completionStatus === 'IN_PROGRESS'
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : 'bg-gray-100 text-gray-800'
+                            }`}>
+                              {exercise.completionStatus?.replace('_', ' ') || 'PENDING'}
+                            </span>
+                          </div>
+                        </div>
+                        
+                        {exercise.completionStatus !== 'COMPLETED' && (
+                          <button
+                            onClick={() => handleCompleteExercise(exercise.id || `${index}`)}
+                            className="ml-3 bg-green-600 hover:bg-green-700 text-white text-xs font-medium py-1 px-2 rounded transition-colors"
+                            title="Mark exercise as completed"
+                          >
+                            ✓
+                          </button>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>

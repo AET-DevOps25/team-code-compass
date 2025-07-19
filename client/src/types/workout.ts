@@ -3,7 +3,8 @@ export enum SportType {
   STRENGTH = "STRENGTH",
   HIIT = "HIIT",
   YOGA_MOBILITY = "YOGA_MOBILITY",
-  RUNNING_INTERVALS = "RUNNING_INTERVALS"
+  RUNNING_INTERVALS = "RUNNING_INTERVALS",
+  REST = "REST"
 }
 
 export enum CompletionStatus {
@@ -47,6 +48,7 @@ export interface WorkoutPlanGenerationRequest {
   dayDate: string; // ISO date string (YYYY-MM-DD)
   focusSportType: SportType;
   targetDurationMinutes: number;
+  textPrompt?: string; // Optional custom prompt for workout generation
 }
 
 // Response DTOs
