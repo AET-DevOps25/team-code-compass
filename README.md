@@ -6,6 +6,7 @@ A comprehensive microservices-based fitness application featuring AI-powered wor
 
 - **[Problem Statement](docs/problem_statement.md)**
 - **[System Overview](docs/system_overview.md)**
+- **[CI/CD Pipeline Guide](docs/CI_CD_GUIDE.md)**
 
 ## 📋 Table of Contents
 
@@ -367,6 +368,15 @@ curl -X POST http://localhost:8080/api/v1/workout-plans/generate \
 | `main` | ✅ Run | ✅ Run | ✅ Build & Push | ✅ Deploy |
 | `development` | ✅ Run | ✅ Run | ✅ Build & Push | ✅ Deploy |
 | `production` | ✅ Run | ✅ Run | ✅ Build & Push | ✅ Deploy |
+
+### 📚 For Complete CI/CD Guide
+
+**📖 [See Detailed CI/CD Pipeline Guide](docs/CI_CD_GUIDE.md)** for:
+- 🎮 Manual triggers and testing
+- 🔍 Pipeline monitoring and verification  
+- 🛠️ Troubleshooting and debugging
+- 🔐 Secrets management
+- ⚡ Quick reference commands
 
 ## 🚢 Deployment Guide
 

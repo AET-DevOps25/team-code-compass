@@ -1,9 +1,9 @@
 global:
-  # Static email configuration for testing
-  smtp_smarthost: 'smtp.gmail.com:587'
-  smtp_from: 'hakanduranyt@gmail.com'
-  smtp_auth_username: 'hakanduranyt@gmail.com'
-  smtp_auth_password: 'your_app_password_here'  # You'll need to set your Gmail App Password
+  # SMTP configuration from environment variables
+  smtp_smarthost: '${SMTP_HOST:-smtp.gmail.com:587}'
+  smtp_from: '${ALERT_EMAIL_FROM:-hakanduranyt@gmail.com}'
+  smtp_auth_username: '${ALERT_EMAIL_USERNAME:-hakanduranyt@gmail.com}'
+  smtp_auth_password: '${ALERT_EMAIL_PASSWORD:-your_app_password_here}'
   smtp_require_tls: true
 
 route:
@@ -29,7 +29,7 @@ receivers:
   # Critical alerts - immediate notification
   - name: 'critical-alerts'
     email_configs:
-      - to: 'hakanduranyt@gmail.com'
+      - to: '${ALERT_EMAIL_TO:-hakanduranyt@gmail.com}'
         subject: '🚨 [CRITICAL] FlexFit Alert: {{ .GroupLabels.alertname }}'
         html: |
           <h2 style="color: red;">🚨 CRITICAL ALERT</h2>
@@ -52,7 +52,7 @@ receivers:
   # Warning alerts - standard notification
   - name: 'warning-alerts'
     email_configs:
-      - to: 'hakanduranyt@gmail.com'
+      - to: '${ALERT_EMAIL_TO:-hakanduranyt@gmail.com}'
         subject: '⚠️ [WARNING] FlexFit Alert: {{ .GroupLabels.alertname }}'
         html: |
           <h2 style="color: orange;">⚠️ WARNING ALERT</h2>
@@ -72,7 +72,7 @@ receivers:
   # Default team notifications
   - name: 'flexfit-team'
     email_configs:
-      - to: 'hakanduranyt@gmail.com'
+      - to: '${ALERT_EMAIL_TO:-hakanduranyt@gmail.com}'
         subject: '[FlexFit] Alert: {{ .GroupLabels.alertname }}'
         body: |
           FlexFit System Alert:

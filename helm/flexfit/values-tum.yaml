@@ -47,6 +47,16 @@ monitoring:
     adminPassword: "${GRAFANA_ADMIN_PASSWORD:-admin}"
   alertmanager:
     enabled: true
+  
+  # Email alerts configuration
+  alerts:
+    email:
+      enabled: true
+      smtpHost: "${SMTP_HOST:-smtp.gmail.com:587}"
+      from: "${ALERT_EMAIL_FROM:-hakanduranyt@gmail.com}"
+      to: "${ALERT_EMAIL_TO:-hakanduranyt@gmail.com}"
+      username: "${ALERT_EMAIL_USERNAME:-hakanduranyt@gmail.com}"
+      password: "${ALERT_EMAIL_PASSWORD:-your_gmail_app_password_here}"
 
 # TUM cluster specific ingress configuration
 ingress:
