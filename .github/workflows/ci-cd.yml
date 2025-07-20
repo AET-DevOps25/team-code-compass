@@ -126,13 +126,13 @@ jobs:
       - name: 📦 Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest requests fastapi uvicorn
+          pip install pytest requests fastapi uvicorn httpx
 
       - name: 🧪 Run Java Unit Tests
         run: |
           echo "🧪 Running Java unit tests..."
-          cd server/user-service && ./mvnw test -Dspring.profiles.active=test
-          cd ../../server/workout-plan-service && ./mvnw test -Dspring.profiles.active=test
+          cd server/user-service && chmod +x ./mvnw && ./mvnw test -Dspring.profiles.active=test
+          cd ../workout-plan-service && chmod +x ./mvnw && ./mvnw test -Dspring.profiles.active=test
           echo "✅ Java unit tests completed"
 
       - name: 🧪 Run Python Unit Tests
@@ -142,14 +142,14 @@ jobs:
         run: |
           echo "🧪 Running Python unit tests..."
           cd genai && python -m pytest test_workout_worker.py -v
-          cd .. && cd genai && python -m pytest test_workout_worker_local.py -v
+          python -m pytest test_workout_worker_local.py -v
           echo "✅ Python unit tests completed"
 
       - name: 🌐 Run Client Tests
         run: |
           echo "🌐 Running client tests..."
           cd client && node tests/core-workflows.test.js
-          cd client && node tests/ai-preference-integration.test.js
+          node tests/ai-preference-integration.test.js
           echo "✅ Client tests completed"
 
       - name: 📊 Unit Test Summary
