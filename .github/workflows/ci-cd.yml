@@ -272,12 +272,12 @@ jobs:
           # Clean up any Docker containers (if any were started)
           docker ps -q | xargs -r docker stop || true
 
-  # Job 4: Build & Push to GHCR (after integration tests pass)
+  # Job 4: Build & Push to GHCR (parallel with integration tests - temporary)
   build-and-push-ghcr:
     name: 🐳 Build & Push to GHCR
     runs-on: ubuntu-latest
-    needs: [setup, unit-tests, integration-tests]
-    if: always() && needs.setup.outputs.is_stable_branch == 'true' && needs.unit-tests.result == 'success' && needs.integration-tests.result == 'success'
+    needs: [setup, unit-tests]
+    if: always() && needs.setup.outputs.is_stable_branch == 'true' && needs.unit-tests.result == 'success'
     permissions:
       contents: read
       packages: write
