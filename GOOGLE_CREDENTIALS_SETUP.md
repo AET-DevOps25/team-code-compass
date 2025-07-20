@@ -1,54 +1,54 @@
 # 🔐 Google Cloud TTS Credentials Setup
 
-Bu doküman, FlexFit projesinde Google Cloud Text-to-Speech (TTS) servisi için credentials kurulumunu açıklar.
+This document explains the Google Cloud Text-to-Speech (TTS) service credentials setup for the FlexFit project.
 
-## 📋 Gereksinimler
+## 📋 Requirements
 
-- Google Cloud hesabı
-- Text-to-Speech API etkinleştirilmiş
-- Service Account JSON dosyası
+- Google Cloud account
+- Text-to-Speech API enabled
+- Service Account JSON file
 
-## 🚀 Hızlı Kurulum
+## 🚀 Quick Setup
 
-### 1. Otomatik Kurulum (Önerilen)
+### 1. Automatic Setup (Recommended)
 
 ```bash
-# 1. Google Cloud service account JSON dosyanızı şu konuma kopyalayın:
+# 1. Copy your Google Cloud service account JSON file to this location:
 cp your-credentials.json server/tts-service/google-credentials.json
 
-# 2. Setup script'ini çalıştırın:
+# 2. Run the setup script:
 ./setup-credentials.sh
 ```
 
-### 2. Manuel Kurulum
+### 2. Manual Setup
 
-#### Seçenek A: Environment Variable (Production için önerilen)
+#### Option A: Environment Variable (Recommended for Production)
 
 ```bash
-# 1. JSON dosyasını base64 encode edin
+# 1. Base64 encode the JSON file
 cat your-credentials.json | base64 -w 0
 
-# 2. .env dosyasına ekleyin
+# 2. Add to .env file
 echo "GOOGLE_APPLICATION_CREDENTIALS_JSON=your_encoded_string_here" >> .env
 ```
 
-#### Seçenek B: Local File (Development için)
+#### Option B: Local File (For Development)
 
 ```bash
-# 1. JSON dosyasını TTS service dizinine kopyalayın
+# 1. Copy the JSON file to the TTS service directory
 cp your-credentials.json server/tts-service/google-credentials.json
 ```
 
-## 🔧 Konfigürasyon Detayları
+## 🔧 Configuration Details
 
 ### Environment Variables
 
-| Variable | Açıklama | Örnek |
-|----------|----------|-------|
+| Variable | Description | Example |
+|----------|-------------|---------|
 | `GOOGLE_APPLICATION_CREDENTIALS_JSON` | Base64 encoded JSON | `eyJ0eXBlIjoic2VydmljZV9hY2NvdW50Ii...` |
 | `GOOGLE_APPLICATION_CREDENTIALS_PATH` | Local file path | `/app/google-credentials.json` |
 
-### Docker Compose Konfigürasyonu
+### Docker Compose Configuration
 
 ```yaml
 tts-service:
@@ -59,15 +59,15 @@ tts-service:
     - ./server/tts-service/google-credentials.json:/app/google-credentials.json:ro
 ```
 
-### Kubernetes Konfigürasyonu
+### Kubernetes Configuration
 
 ```yaml
-# Secret oluşturma
+# Create secret
 kubectl create secret generic flexfit-google-credentials \
   --from-literal=credentials.json="$GOOGLE_CREDENTIALS" \
   --namespace flexfit
 
-# Deployment'da kullanım
+# Usage in deployment
 env:
   - name: GOOGLE_APPLICATION_CREDENTIALS_JSON
     valueFrom:
@@ -76,11 +76,11 @@ env:
         key: credentials.json
 ```
 
-## 🔒 Güvenlik
+## 🔒 Security
 
-### .gitignore Konfigürasyonu
+### .gitignore Configuration
 
-Aşağıdaki dosyalar otomatik olarak .gitignore'a eklenmiştir:
+The following files are automatically added to .gitignore:
 
 ```
 # Google Cloud credentials
@@ -90,24 +90,24 @@ google-service-account.json
 *.json
 !package.json
 !tsconfig.json
-# ... diğer gerekli JSON dosyaları
+# ... other necessary JSON files
 ```
 
 ### GitHub Secrets
 
-Production deployment için GitHub repository secrets'a ekleyin:
+Add to GitHub repository secrets for production deployment:
 
 1. **GOOGLE_CREDENTIALS**: Base64 encoded service account JSON
 2. **CHAIR_API_KEY**: GenAI API key
 3. **AWS_ACCESS_KEY_ID**: AWS credentials
 4. **AWS_SECRET_ACCESS_KEY**: AWS credentials
 
-## 🧪 Test Etme
+## 🧪 Testing
 
 ### Local Test
 
 ```bash
-# 1. Servisleri başlatın
+# 1. Start services
 docker compose up tts-service
 
 # 2. Health check
@@ -122,59 +122,59 @@ curl -X POST http://localhost:8083/api/tts/synthesize \
 ### Kubernetes Test
 
 ```bash
-# 1. Pod durumunu kontrol edin
+# 1. Check pod status
 kubectl get pods -n flexfit -l app.kubernetes.io/component=tts-service
 
-# 2. Logları kontrol edin
+# 2. Check logs
 kubectl logs -n flexfit -l app.kubernetes.io/component=tts-service
 
-# 3. Service endpoint'ini test edin
+# 3. Test service endpoint
 kubectl port-forward -n flexfit svc/flexfit-tts-service 8083:8083
 ```
 
-## 🚨 Sorun Giderme
+## 🚨 Troubleshooting
 
-### Yaygın Hatalar
+### Common Errors
 
 1. **"No credentials found"**
-   - JSON dosyasının doğru konumda olduğunu kontrol edin
-   - Environment variable'ın doğru set edildiğini kontrol edin
+   - Check that the JSON file is in the correct location
+   - Check that the environment variable is set correctly
 
 2. **"Permission denied"**
-   - Service account'un Text-to-Speech API'ye erişimi olduğunu kontrol edin
-   - JSON dosyasının doğru formatda olduğunu kontrol edin
+   - Check that the service account has access to Text-to-Speech API
+   - Check that the JSON file is in the correct format
 
 3. **"Invalid credentials"**
-   - JSON dosyasının geçerli olduğunu kontrol edin
-   - Service account'un aktif olduğunu kontrol edin
+   - Check that the JSON file is valid
+   - Check that the service account is active
 
-### Debug Komutları
+### Debug Commands
 
 ```bash
-# Environment variable'ı kontrol edin
+# Check environment variable
 echo $GOOGLE_APPLICATION_CREDENTIALS_JSON | base64 -d
 
-# JSON dosyasının varlığını kontrol edin
+# Check JSON file existence
 ls -la server/tts-service/google-credentials.json
 
-# TTS service loglarını kontrol edin
+# Check TTS service logs
 docker compose logs tts-service
 ```
 
-## 📚 Ek Kaynaklar
+## 📚 Additional Resources
 
 - [Google Cloud Text-to-Speech API](https://cloud.google.com/text-to-speech)
 - [Service Account Authentication](https://cloud.google.com/docs/authentication/service-accounts)
 - [Spring Boot Google Cloud](https://spring.io/projects/spring-cloud-gcp)
 
-## 🤝 Katkıda Bulunma
+## 🤝 Contributing
 
-Bu dokümanı güncellemek için:
+To update this document:
 
-1. Değişiklikleri yapın
-2. Test edin
-3. Pull request oluşturun
+1. Make changes
+2. Test them
+3. Create a pull request
 
 ---
 
-**Not**: Bu credentials dosyaları asla version control'e commit edilmemelidir! 
+**Note**: These credentials files should never be committed to version control! 

@@ -798,7 +798,7 @@ export default function FlexFitApp() {
       return
     }
 
-    await synthesizeAudio({
+    await generateAudio({
       text: plainText,
       voiceName: selectedVoice,
       languageCode: 'en-US',
@@ -2117,7 +2117,7 @@ export default function FlexFitApp() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="en-US-Neural2-F">Female Voice (US)</SelectItem>
-                          <SelectItem value="en-US-Neural2-M">Male Voice (US)</SelectItem>
+                          <SelectItem value="en-US-Neural2-D">Male Voice (US)</SelectItem>
                           <SelectItem value="en-US-Neural2-A">Neutral Voice (US)</SelectItem>
                         </SelectContent>
                       </Select>

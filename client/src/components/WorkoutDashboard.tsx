@@ -108,7 +108,7 @@ export function WorkoutDashboard() {
       return;
     }
 
-    await synthesizeAudio({
+    await generateAudio({
       text: plainText,
       voiceName: selectedVoice,
       languageCode: 'en-US',
@@ -263,7 +263,7 @@ export function WorkoutDashboard() {
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="en-US-Neural2-F">Female Voice (US)</option>
-            <option value="en-US-Neural2-M">Male Voice (US)</option>
+                            <option value="en-US-Neural2-D">Male Voice (US)</option>
             <option value="en-US-Neural2-A">Neutral Voice (US)</option>
           </select>
         </div>

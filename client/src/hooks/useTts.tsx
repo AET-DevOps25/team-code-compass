@@ -11,6 +11,12 @@ export interface TtsRequest {
 export interface TtsResponse {
   audioContent: string
   audioUrl?: string
+  text?: string
+  voiceName?: string
+  languageCode?: string
+  audioEncoding?: string
+  generatedAt?: string
+  audioSizeBytes?: number
 }
 
 export interface Voice {
@@ -34,8 +40,23 @@ export const useTts = () => {
     
     try {
       const response = await ttsService.generateAudio(request)
-      setAudioUrl(response.audioUrl || null)
-      setAudioBlob(null) // Will be set when audio is loaded
+      
+      // Convert base64 to blob if audioContent is available
+      if (response.audioContent) {
+        const byteCharacters = atob(response.audioContent)
+        const byteNumbers = new Array(byteCharacters.length)
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i)
+        }
+        const byteArray = new Uint8Array(byteNumbers)
+        const blob = new Blob([byteArray], { type: 'audio/mp3' })
+        setAudioBlob(blob)
+        setAudioUrl(URL.createObjectURL(blob))
+      } else {
+        setAudioUrl(response.audioUrl || null)
+        setAudioBlob(null)
+      }
+      
       return response
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to generate audio'

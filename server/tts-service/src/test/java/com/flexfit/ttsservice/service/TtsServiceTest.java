@@ -165,6 +165,7 @@ class TtsServiceTest {
         // Given & When
         TtsResponse response = new TtsResponse(
             "http://example.com/audio.mp3",
+            "base64audio",
             "Test workout plan",
             "en-US-Neural2-F",
             "en-US",

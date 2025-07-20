@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.UUID;
+import java.util.Base64;
 
 @Service
 public class TtsServiceImpl implements TtsService {
@@ -85,6 +86,7 @@ public class TtsServiceImpl implements TtsService {
             // Create response with metadata
             TtsResponse response = new TtsResponse();
             response.setAudioUrl("/api/tts/audio/" + filename);
+            response.setAudioContent(Base64.getEncoder().encodeToString(audioData));
             response.setText(request.getText());
             response.setVoiceName(request.getVoiceName());
             response.setLanguageCode(request.getLanguageCode());

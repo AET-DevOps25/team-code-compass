@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 public class TtsResponse {
     
     private String audioUrl;
+    private String audioContent;
     private String text;
     private String voiceName;
     private String languageCode;
@@ -16,10 +17,11 @@ public class TtsResponse {
     public TtsResponse() {}
     
     // Constructor with all fields
-    public TtsResponse(String audioUrl, String text, String voiceName, 
+    public TtsResponse(String audioUrl, String audioContent, String text, String voiceName, 
                       String languageCode, String audioEncoding, 
                       LocalDateTime generatedAt, long audioSizeBytes) {
         this.audioUrl = audioUrl;
+        this.audioContent = audioContent;
         this.text = text;
         this.voiceName = voiceName;
         this.languageCode = languageCode;
@@ -35,6 +37,14 @@ public class TtsResponse {
     
     public void setAudioUrl(String audioUrl) {
         this.audioUrl = audioUrl;
+    }
+    
+    public String getAudioContent() {
+        return audioContent;
+    }
+    
+    public void setAudioContent(String audioContent) {
+        this.audioContent = audioContent;
     }
     
     public String getText() {
