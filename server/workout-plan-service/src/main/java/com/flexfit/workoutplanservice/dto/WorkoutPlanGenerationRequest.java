@@ -23,5 +23,8 @@ public class WorkoutPlanGenerationRequest {
     private Integer targetDurationMinutes;
     
     private String textPrompt;
+    
+    // AI preference: "cloud" for Claude/OpenAI, "local" for local models
+    private String aiPreference = "cloud";
 }
 

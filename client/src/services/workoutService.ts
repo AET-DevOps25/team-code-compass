@@ -9,6 +9,7 @@ import {
   WorkoutInfoResponse,
   SportType
 } from '../types/workout';
+import { formatDateForAPI, getTodayLocalDate } from '../utils/dateUtils';
 
 // Add weekly generation options
 export interface WeeklyWorkoutGenerationOptions {
@@ -28,9 +29,10 @@ export class WorkoutService {
     // Use current user if no userId provided (will be handled by backend auth)
     const request: WorkoutPlanGenerationRequest = {
       userId: userId || '', // Backend will extract from token if empty
-      dayDate: options.date || new Date().toISOString().split('T')[0], // Default to today
+      dayDate: options.date || getTodayLocalDate(), // Default to today in local timezone
       focusSportType: options.sportType,
-      targetDurationMinutes: options.targetDurationMinutes
+      targetDurationMinutes: options.targetDurationMinutes,
+      aiPreference: options.aiPreference || 'cloud' // Default to cloud
     };
 
     return apiClient.post<DailyWorkoutResponse, WorkoutPlanGenerationRequest>(
@@ -115,7 +117,7 @@ export class WorkoutService {
    * you'd get this from the auth context or user profile
    */
   async getTodaysWorkout(userId: string): Promise<ApiResponse<DailyWorkoutResponse>> {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayLocalDate();
     return this.getMyWorkoutByDate(today, userId);
   }
 
@@ -133,8 +135,8 @@ export class WorkoutService {
     endOfWeek.setDate(today.getDate() + (6 - today.getDay())); // End of current week (Saturday)
 
     const dateRange: WorkoutDateRange = {
-      startDate: startOfWeek.toISOString().split('T')[0],
-      endDate: endOfWeek.toISOString().split('T')[0]
+      startDate: formatDateForAPI(startOfWeek),
+      endDate: formatDateForAPI(endOfWeek)
     };
 
     return this.getMyWorkoutsByDateRange(dateRange, userId);
@@ -154,8 +156,8 @@ export class WorkoutService {
     yesterday.setDate(today.getDate() - 1);
 
     const dateRange: WorkoutDateRange = {
-      startDate: sevenDaysAgo.toISOString().split('T')[0],
-      endDate: yesterday.toISOString().split('T')[0]
+      startDate: formatDateForAPI(sevenDaysAgo),
+      endDate: formatDateForAPI(yesterday)
     };
 
     return this.getMyWorkoutsByDateRange(dateRange, userId);
@@ -172,8 +174,8 @@ export class WorkoutService {
     const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
 
     const dateRange: WorkoutDateRange = {
-      startDate: startOfMonth.toISOString().split('T')[0],
-      endDate: endOfMonth.toISOString().split('T')[0]
+      startDate: formatDateForAPI(startOfMonth),
+      endDate: formatDateForAPI(endOfMonth)
     };
 
     return this.getMyWorkoutsByDateRange(dateRange, userId);
@@ -211,14 +213,14 @@ export class WorkoutService {
     const nextMonday = new Date(today);
     const daysUntilMonday = (7 - today.getDay() + 1) % 7 || 7; // Get days until next Monday
     nextMonday.setDate(today.getDate() + daysUntilMonday);
-    return nextMonday.toISOString().split('T')[0];
+    return formatDateForAPI(nextMonday);
   }
 
   /**
    * Utility methods for date handling
    */
   static formatDateForAPI(date: Date): string {
-    return date.toISOString().split('T')[0];
+    return formatDateForAPI(date);
   }
 
   static parseAPIDate(dateString: string): Date {

@@ -89,12 +89,12 @@ services:
       timeout: 10s
       retries: 3
 
-  # GenAI Workout Worker (Open WebUI)
+  # GenAI Workout Worker (Cloud - Open WebUI)
   genai-workout-worker:
     build: ./genai
     container_name: flexfit-genai-worker
     ports:
-      - "8000:8000"
+      - "8083:8000"
     networks:
       - flexfit-network
     environment:
@@ -105,6 +105,32 @@ services:
       # - MOCK_MODE=true  # Enable for faster testing
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # GenAI Workout Worker (Local - GPT4All/Ollama)
+  genai-workout-worker-local:
+    build: 
+      context: ./genai
+      dockerfile: Dockerfile.local
+    container_name: flexfit-genai-worker-local
+    ports:
+      - "8084:8084"
+    networks:
+      - flexfit-network
+    environment:
+      # Local AI Configuration
+      - LOCAL_MODEL_TYPE=mock  # mock, gpt4all, ollama
+      - OLLAMA_BASE_URL=http://localhost:11434
+      - OLLAMA_MODEL=llama2
+      - GPT4ALL_MODEL_PATH=/app/models/ggml-gpt4all-j-v1.3-groovy.bin
+      - MOCK_MODE=true  # Enable for development without actual models
+    volumes:
+      # Mount for local model storage (optional)
+      - ./genai/models:/app/models:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8084/health"]
       interval: 30s
       timeout: 10s
       retries: 3
