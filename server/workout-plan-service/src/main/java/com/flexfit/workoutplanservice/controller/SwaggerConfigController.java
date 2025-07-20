@@ -13,7 +13,7 @@ import java.util.HashMap;
 @RestController
 public class SwaggerConfigController {
 
-    @Autowired
+    @Autowired(required = false)
     private SwaggerUiConfigProperties swaggerUiConfigProperties;
 
     @GetMapping("/v3/api-docs/swagger-config")
@@ -29,9 +29,17 @@ public class SwaggerConfigController {
         
         config.put("configUrl", basePath + "/swagger-config");
         config.put("url", basePath);
-        config.put("filter", swaggerUiConfigProperties.getFilter());
-        config.put("tryItOutEnabled", swaggerUiConfigProperties.getTryItOutEnabled());
-        config.put("validatorUrl", swaggerUiConfigProperties.getValidatorUrl());
+        
+        // Add default values if SwaggerUiConfigProperties is not available (e.g., in tests)
+        if (swaggerUiConfigProperties != null) {
+            config.put("filter", swaggerUiConfigProperties.getFilter());
+            config.put("tryItOutEnabled", swaggerUiConfigProperties.getTryItOutEnabled());
+            config.put("validatorUrl", swaggerUiConfigProperties.getValidatorUrl());
+        } else {
+            config.put("filter", false);
+            config.put("tryItOutEnabled", true);
+            config.put("validatorUrl", "");
+        }
         
         // Build OAuth2 redirect URL
         String scheme = request.getScheme();

@@ -12,11 +12,16 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.RestTemplate;
+import com.flexfit.workoutplanservice.dto.user.UserResponse;
+import com.flexfit.workoutplanservice.dto.user.UserPreferencesResponse;
 
 import java.time.LocalDate;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -87,9 +92,15 @@ class WorkoutPlanServiceTest {
         String bearerToken = "Bearer test-token";
         
         // Mock user service response
-        String mockUserResponse = "{\"preferences\":{\"experienceLevel\":\"INTERMEDIATE\"}}";
-        when(userSvcRestTemplate.getForObject(anyString(), eq(String.class)))
-            .thenReturn(mockUserResponse);
+        UserPreferencesResponse mockPreferences = new UserPreferencesResponse(
+            "INTERMEDIATE", null, null, null, null, null, null, null
+        );
+        UserResponse mockUser = new UserResponse(
+            request.getUserId(), "testuser", "test@example.com", 
+            LocalDate.of(1990, 1, 1), 180, 75.0, "M", mockPreferences
+        );
+        when(userSvcRestTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(UserResponse.class), any(UUID.class)))
+            .thenReturn(new ResponseEntity<>(mockUser, HttpStatus.OK));
             
         // Mock cloud GenAI service response
         String mockGenAIResponse = "{\"workoutPlan\":{\"title\":\"Cloud AI Workout\",\"exercises\":[]}}";
@@ -103,7 +114,7 @@ class WorkoutPlanServiceTest {
         
         // Mock mapper
         DailyWorkoutResponse mockResponse = new DailyWorkoutResponse();
-        when(mapper.toResponse(any(DailyWorkout.class))).thenReturn(mockResponse);
+        when(mapper.toDailyWorkoutResponse(any(DailyWorkout.class))).thenReturn(mockResponse);
 
         // When
         DailyWorkoutResponse result = workoutPlanService.generateWorkoutPlan(request, bearerToken);
@@ -132,9 +143,15 @@ class WorkoutPlanServiceTest {
         String bearerToken = "Bearer test-token";
         
         // Mock user service response
-        String mockUserResponse = "{\"preferences\":{\"experienceLevel\":\"INTERMEDIATE\"}}";
-        when(userSvcRestTemplate.getForObject(anyString(), eq(String.class)))
-            .thenReturn(mockUserResponse);
+        UserPreferencesResponse mockPreferences = new UserPreferencesResponse(
+            "INTERMEDIATE", null, null, null, null, null, null, null
+        );
+        UserResponse mockUser = new UserResponse(
+            request.getUserId(), "testuser", "test@example.com", 
+            LocalDate.of(1990, 1, 1), 180, 75.0, "M", mockPreferences
+        );
+        when(userSvcRestTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(UserResponse.class), any(UUID.class)))
+            .thenReturn(new ResponseEntity<>(mockUser, HttpStatus.OK));
             
         // Mock local GenAI service response
         String mockGenAIResponse = "{\"workoutPlan\":{\"title\":\"Local AI Workout\",\"exercises\":[]}}";
@@ -148,7 +165,7 @@ class WorkoutPlanServiceTest {
         
         // Mock mapper
         DailyWorkoutResponse mockResponse = new DailyWorkoutResponse();
-        when(mapper.toResponse(any(DailyWorkout.class))).thenReturn(mockResponse);
+        when(mapper.toDailyWorkoutResponse(any(DailyWorkout.class))).thenReturn(mockResponse);
 
         // When
         DailyWorkoutResponse result = workoutPlanService.generateWorkoutPlan(request, bearerToken);
@@ -177,9 +194,15 @@ class WorkoutPlanServiceTest {
         String bearerToken = "Bearer test-token";
         
         // Mock user service response
-        String mockUserResponse = "{\"preferences\":{\"experienceLevel\":\"INTERMEDIATE\"}}";
-        when(userSvcRestTemplate.getForObject(anyString(), eq(String.class)))
-            .thenReturn(mockUserResponse);
+        UserPreferencesResponse mockPreferences = new UserPreferencesResponse(
+            "INTERMEDIATE", null, null, null, null, null, null, null
+        );
+        UserResponse mockUser = new UserResponse(
+            request.getUserId(), "testuser", "test@example.com", 
+            LocalDate.of(1990, 1, 1), 180, 75.0, "M", mockPreferences
+        );
+        when(userSvcRestTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(UserResponse.class), any(UUID.class)))
+            .thenReturn(new ResponseEntity<>(mockUser, HttpStatus.OK));
             
         // Mock cloud GenAI service response
         String mockGenAIResponse = "{\"workoutPlan\":{\"title\":\"Cloud AI Workout\",\"exercises\":[]}}";
@@ -193,7 +216,7 @@ class WorkoutPlanServiceTest {
         
         // Mock mapper
         DailyWorkoutResponse mockResponse = new DailyWorkoutResponse();
-        when(mapper.toResponse(any(DailyWorkout.class))).thenReturn(mockResponse);
+        when(mapper.toDailyWorkoutResponse(any(DailyWorkout.class))).thenReturn(mockResponse);
 
         // When
         DailyWorkoutResponse result = workoutPlanService.generateWorkoutPlan(request, bearerToken);
@@ -221,9 +244,15 @@ class WorkoutPlanServiceTest {
         String bearerToken = "Bearer test-token";
         
         // Mock user service response
-        String mockUserResponse = "{\"preferences\":{\"experienceLevel\":\"INTERMEDIATE\"}}";
-        when(userSvcRestTemplate.getForObject(anyString(), eq(String.class)))
-            .thenReturn(mockUserResponse);
+        UserPreferencesResponse mockPreferences = new UserPreferencesResponse(
+            "INTERMEDIATE", null, null, null, null, null, null, null
+        );
+        UserResponse mockUser = new UserResponse(
+            request.getUserId(), "testuser", "test@example.com", 
+            LocalDate.of(1990, 1, 1), 180, 75.0, "M", mockPreferences
+        );
+        when(userSvcRestTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(UserResponse.class), any(UUID.class)))
+            .thenReturn(new ResponseEntity<>(mockUser, HttpStatus.OK));
             
         // Mock cloud GenAI service response
         String mockGenAIResponse = "{\"workoutPlan\":{\"title\":\"Cloud AI Workout\",\"exercises\":[]}}";
@@ -237,7 +266,7 @@ class WorkoutPlanServiceTest {
         
         // Mock mapper
         DailyWorkoutResponse mockResponse = new DailyWorkoutResponse();
-        when(mapper.toResponse(any(DailyWorkout.class))).thenReturn(mockResponse);
+        when(mapper.toDailyWorkoutResponse(any(DailyWorkout.class))).thenReturn(mockResponse);
 
         // When
         DailyWorkoutResponse result = workoutPlanService.generateWorkoutPlan(request, bearerToken);
