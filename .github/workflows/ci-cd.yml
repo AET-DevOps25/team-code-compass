@@ -220,22 +220,76 @@ jobs:
 
       - name: 🔗 Run Integration Tests
         env:
-          POSTGRES_URL: jdbc:postgresql://localhost:5432/flexfit_test
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/flexfit_test
+          SPRING_DATASOURCE_USERNAME: postgres
+          SPRING_DATASOURCE_PASSWORD: postgres
+          SPRING_PROFILES_ACTIVE: test
         run: |
           echo "🔗 Running integration tests..."
-          echo "Using regular docker-compose (PostgreSQL from CI service)..."
-          # Start all services except database (using CI PostgreSQL service)
-          docker compose -f docker-compose.yml up -d --scale db=0
-          sleep 30  # Wait for services to start
+          echo "Starting Java services directly on Ubuntu (using CI PostgreSQL)..."
+          
+          # Start Service Registry
+          echo "Starting Service Registry..."
+          cd server/service-registry
+          ./mvnw spring-boot:run -Dspring-boot.run.arguments="--server.port=8761" &
+          SERVICE_REGISTRY_PID=$!
+          cd ../..
+          
+          # Wait for Service Registry
+          sleep 15
+          echo "Waiting for Service Registry to be ready..."
+          timeout 60 bash -c 'while ! curl -s http://localhost:8761/actuator/health; do sleep 2; done'
+          
+          # Start User Service
+          echo "Starting User Service..."
+          cd server/user-service
+          ./mvnw spring-boot:run -Dspring-boot.run.arguments="--server.port=8081 --eureka.client.service-url.defaultZone=http://localhost:8761/eureka" &
+          USER_SERVICE_PID=$!
+          cd ../..
+          
+          # Start Workout Plan Service  
+          echo "Starting Workout Plan Service..."
+          cd server/workout-plan-service
+          ./mvnw spring-boot:run -Dspring-boot.run.arguments="--server.port=8082 --eureka.client.service-url.defaultZone=http://localhost:8761/eureka" &
+          WORKOUT_SERVICE_PID=$!
+          cd ../..
+          
+          # Start API Gateway
+          echo "Starting API Gateway..."
+          cd server/api-gateway
+          ./mvnw spring-boot:run -Dspring-boot.run.arguments="--server.port=8080 --eureka.client.service-url.defaultZone=http://localhost:8761/eureka" &
+          API_GATEWAY_PID=$!
+          cd ../..
+          
+          # Wait for all services to be ready
+          echo "Waiting for services to be ready..."
+          sleep 30
+          
+          # Check service health
+          echo "Checking service health..."
+          curl -f http://localhost:8761/actuator/health || echo "Service Registry not ready"
+          curl -f http://localhost:8081/actuator/health || echo "User Service not ready"  
+          curl -f http://localhost:8082/actuator/health || echo "Workout Service not ready"
+          curl -f http://localhost:8080/actuator/health || echo "API Gateway not ready"
+          
+          # Run integration tests
+          echo "Running integration tests..."
           ./run-integration-tests.sh --test-only
+          
+          # Cleanup processes
+          echo "Stopping services..."
+          kill $SERVICE_REGISTRY_PID $USER_SERVICE_PID $WORKOUT_SERVICE_PID $API_GATEWAY_PID 2>/dev/null || true
+          
           echo "✅ Integration tests completed"
 
       - name: 🧹 Cleanup
         if: always()
         run: |
-          docker compose -f docker-compose.yml down -v || true
+          echo "🧹 Cleaning up integration test processes..."
+          # Kill any remaining Java processes
+          pkill -f "spring-boot:run" || true
+          # Clean up any Docker containers (if any were started)
+          docker ps -q | xargs -r docker stop || true
 
   # Job 4: System Tests
   system-tests:
