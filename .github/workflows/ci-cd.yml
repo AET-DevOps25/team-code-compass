@@ -1,10 +1,19 @@
 name: 🚀 FlexFit CI/CD Pipeline
 
+# 🎯 CI/CD Strategy:
+# ┌─────────────────┬──────────────┬────────────────┬──────────────┬──────────────┐
+# │ Branch Type     │ Unit Tests   │ Integration    │ System Tests │ Build & Push │
+# ├─────────────────┼──────────────┼────────────────┼──────────────┼──────────────┤
+# │ Feature/*       │ ✅ Always    │ ✅ Always      │ ❌ Skip      │ ❌ Skip      │
+# │ Pull Requests   │ ✅ Always    │ ✅ Always      │ ❌ Skip      │ ❌ Skip      │
+# │ Main/Dev/Prod   │ ✅ Always    │ ✅ Always      │ ✅ Always    │ ✅ Always    │
+# └─────────────────┴──────────────┴────────────────┴──────────────┴──────────────┘
+
 on:
   push:
-    branches: [ main, development, 'feature/*' ]
+    branches: [ main, development, production, 'feature/*' ]
   pull_request:
-    branches: [ main, development ]
+    branches: [ main, development, production ]
   workflow_dispatch:
     inputs:
       test_level:
@@ -36,6 +45,8 @@ jobs:
       is_pr: ${{ github.event_name == 'pull_request' }}
       is_main: ${{ github.ref == 'refs/heads/main' }}
       is_development: ${{ github.ref == 'refs/heads/development' }}
+      is_production: ${{ github.ref == 'refs/heads/production' }}
+      is_stable_branch: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development' || github.ref == 'refs/heads/production' }}
     steps:
       - name: 📋 Pipeline Information
         run: |
@@ -46,11 +57,13 @@ jobs:
           echo "Actor: ${{ github.actor }}"
           echo ""
           if [[ "${{ github.ref }}" == refs/heads/feature/* ]]; then
-            echo "🌿 Feature Branch - Running unit + integration tests only"
+            echo "🌿 Feature Branch - Unit Tests ✅ | Integration Tests ✅ | System Tests ❌ | Build & Push ❌"
           elif [ "${{ github.event_name }}" == "pull_request" ]; then
-            echo "🔄 Pull Request - Running validation tests"
+            echo "🔄 Pull Request - Unit Tests ✅ | Integration Tests ✅ | System Tests ❌ | Build & Push ❌"
+          elif [[ "${{ github.ref }}" == refs/heads/main || "${{ github.ref }}" == refs/heads/development || "${{ github.ref }}" == refs/heads/production ]]; then
+            echo "🎯 Stable Branch (${{ github.ref_name }}) - Unit Tests ✅ | Integration Tests ✅ | System Tests ✅ | Build & Push ✅"
           else
-            echo "🎯 Main/Development - Running full pipeline"
+            echo "🔍 Other Branch - Unit Tests ✅ | Integration Tests ✅ | System Tests ❌ | Build & Push ❌"
           fi
 
       - name: 🎯 Decide what to run
@@ -288,7 +301,7 @@ jobs:
     name: 🐳 Build & Push to GHCR
     runs-on: ubuntu-latest
     needs: [setup, unit-tests]
-    if: always() && (needs.setup.outputs.is_main == 'true' || needs.setup.outputs.is_development == 'true' || contains(github.ref, 'feature/'))
+    if: always() && needs.setup.outputs.is_stable_branch == 'true'
     permissions:
       contents: read
       packages: write
@@ -347,7 +360,7 @@ jobs:
     name: 🏗️ Build & Package
     runs-on: ubuntu-latest
     needs: [setup, unit-tests, integration-tests, system-tests]
-    if: always() && needs.setup.outputs.is_main == 'true' && needs.unit-tests.result == 'success' && (needs.integration-tests.result == 'success' || needs.integration-tests.result == 'skipped') && (needs.system-tests.result == 'success' || needs.system-tests.result == 'skipped')
+    if: always() && needs.setup.outputs.is_stable_branch == 'true' && needs.unit-tests.result == 'success' && (needs.integration-tests.result == 'success' || needs.integration-tests.result == 'skipped') && (needs.system-tests.result == 'success' || needs.system-tests.result == 'skipped')
     steps:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
