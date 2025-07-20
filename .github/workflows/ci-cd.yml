@@ -128,18 +128,28 @@ jobs:
           python -m pip install --upgrade pip
           pip install pytest requests fastapi uvicorn
 
-      - name: 🧪 Run Java Unit Tests (SKIPPED)
+      - name: 🧪 Run Java Unit Tests
         run: |
-          echo "⚠️ Skipping Java unit tests as requested..."
-          echo "✅ Java unit tests skipped"
+          echo "🧪 Running Java unit tests..."
+          cd server/user-service && ./mvnw test -Dspring.profiles.active=test
+          cd ../../server/workout-plan-service && ./mvnw test -Dspring.profiles.active=test
+          echo "✅ Java unit tests completed"
 
-      - name: 🧪 Run Python Unit Tests (SKIPPED)
+      - name: 🧪 Run Python Unit Tests
         continue-on-error: true
         env:
           CHAIR_API_KEY: ${{ secrets.CHAIR_API_KEY }}
         run: |
-          echo "⚠️ Skipping Python unit tests as requested..."
-          echo "✅ Python unit tests skipped"
+          echo "🧪 Running Python unit tests..."
+          cd genai && python -m pytest test_workout_worker.py -v
+          cd .. && cd genai && python -m pytest test_workout_worker_local.py -v
+          echo "✅ Python unit tests completed"
+
+      - name: 🌐 Run Client Tests
+        run: |
+          echo "🌐 Running client tests..."
+          cd client && node tests/core-workflows.test.js
+          echo "✅ Client tests completed"
 
       - name: 📊 Unit Test Summary
         run: |
@@ -185,22 +195,29 @@ jobs:
           python -m pip install --upgrade pip
           pip install pytest requests fastapi uvicorn
 
-      - name: 🐳 Start services (SKIPPED)
+      - name: 🐳 Start services
         env:
           CHAIR_API_KEY: ${{ secrets.CHAIR_API_KEY }}
         run: |
-          echo "⚠️ Skipping Docker compose startup due to port conflicts..."
-          echo "✅ Service startup skipped"
+          echo "🐳 Starting services for integration tests..."
+          chmod +x run-integration-tests.sh
+          ./run-integration-tests.sh --start-only
+          echo "✅ Services started"
 
-      - name: 🏥 Health checks (SKIPPED)
+      - name: 🏥 Health checks
         run: |
-          echo "⚠️ Skipping health checks as services not started..."
-          echo "✅ Health checks skipped"
+          echo "🏥 Running health checks..."
+          sleep 30
+          curl -f http://localhost:8080/actuator/health || exit 1
+          curl -f http://localhost:8081/actuator/health || exit 1
+          curl -f http://localhost:8082/actuator/health || exit 1
+          echo "✅ Health checks passed"
 
-      - name: 🔗 Run Integration Tests (SKIPPED)
+      - name: 🔗 Run Integration Tests
         run: |
-          echo "⚠️ Skipping integration tests as requested..."
-          echo "✅ Integration tests skipped"
+          echo "🔗 Running integration tests..."
+          ./run-integration-tests.sh --test-only
+          echo "✅ Integration tests completed"
 
       - name: 🧹 Cleanup
         if: always()
@@ -296,6 +313,9 @@ jobs:
             context: ./server/workout-plan-service
           - name: genai-worker
             context: ./genai
+          - name: genai-worker-local
+            context: ./genai
+            dockerfile: ./Dockerfile.local
           - name: frontend
             context: ./client
     steps:
@@ -323,6 +343,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ${{ matrix.service.context }}
+          file: ${{ matrix.service.context }}/${{ matrix.service.dockerfile || 'Dockerfile' }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

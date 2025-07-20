@@ -95,12 +95,12 @@ services:
       retries: 3
     restart: unless-stopped
 
-  # GenAI Workout Worker
+  # GenAI Workout Worker (Cloud - Open WebUI)
   genai-workout-worker:
     image: ghcr.io/aet-devops25/team-code-compass/genai-worker:${IMAGE_TAG:-latest}
     container_name: flexfit-genai-worker
     ports:
-      - "8000:8000"
+      - "8083:8000"
     networks:
       - flexfit-network
     environment:
@@ -109,6 +109,29 @@ services:
       - MODEL_NAME=${MODEL_NAME:-llama3.3:latest}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # GenAI Workout Worker (Local - GPT4All/Ollama)
+  genai-workout-worker-local:
+    image: ghcr.io/aet-devops25/team-code-compass/genai-worker-local:${IMAGE_TAG:-latest}
+    container_name: flexfit-genai-worker-local
+    ports:
+      - "8084:8084"
+    networks:
+      - flexfit-network
+    environment:
+      - LOCAL_MODEL_TYPE=${LOCAL_MODEL_TYPE:-mock}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://localhost:11434}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama2}
+      - GPT4ALL_MODEL_PATH=${GPT4ALL_MODEL_PATH:-/app/models/ggml-gpt4all-j-v1.3-groovy.bin}
+      - MOCK_MODE=${MOCK_MODE:-true}
+    volumes:
+      - genai_models:/app/models:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8084/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -139,3 +162,4 @@ networks:
 
 volumes:
   postgres_data:
+  genai_models:
