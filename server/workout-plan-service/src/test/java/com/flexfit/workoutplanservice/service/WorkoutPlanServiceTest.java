@@ -19,8 +19,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.RestTemplate;
 import com.flexfit.workoutplanservice.dto.user.UserResponse;
 import com.flexfit.workoutplanservice.dto.user.UserPreferencesResponse;
+import com.flexfit.workoutplanservice.dto.gains.GenAIResponse;
+import com.flexfit.workoutplanservice.dto.gains.GenAIDailyWorkout;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -103,8 +106,11 @@ class WorkoutPlanServiceTest {
             .thenReturn(new ResponseEntity<>(mockUser, HttpStatus.OK));
             
         // Mock cloud GenAI service response
-        String mockGenAIResponse = "{\"workoutPlan\":{\"title\":\"Cloud AI Workout\",\"exercises\":[]}}";
-        when(genaiCloudRestTemplate.postForEntity(anyString(), any(), eq(String.class)))
+        GenAIDailyWorkout mockDailyWorkout = new GenAIDailyWorkout(
+            LocalDate.now().toString(), "STRENGTH", List.of(), "Test workout plan"
+        );
+        GenAIResponse mockGenAIResponse = new GenAIResponse(mockDailyWorkout);
+        when(genaiCloudRestTemplate.exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(GenAIResponse.class)))
             .thenReturn(new ResponseEntity<>(mockGenAIResponse, HttpStatus.OK));
             
         // Mock repository save
@@ -121,8 +127,8 @@ class WorkoutPlanServiceTest {
 
         // Then
         assertNotNull(result);
-        verify(genaiCloudRestTemplate, times(1)).postForEntity(anyString(), any(), eq(String.class));
-        verify(genaiLocalRestTemplate, never()).postForEntity(anyString(), any(), eq(String.class));
+        verify(genaiCloudRestTemplate, times(1)).exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(GenAIResponse.class));
+        verify(genaiLocalRestTemplate, never()).exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(GenAIResponse.class));
         verify(dailyWorkoutRepository, times(1)).save(any(DailyWorkout.class));
     }
 
@@ -154,8 +160,11 @@ class WorkoutPlanServiceTest {
             .thenReturn(new ResponseEntity<>(mockUser, HttpStatus.OK));
             
         // Mock local GenAI service response
-        String mockGenAIResponse = "{\"workoutPlan\":{\"title\":\"Local AI Workout\",\"exercises\":[]}}";
-        when(genaiLocalRestTemplate.postForEntity(anyString(), any(), eq(String.class)))
+        GenAIDailyWorkout mockDailyWorkout = new GenAIDailyWorkout(
+            LocalDate.now().toString(), "STRENGTH", List.of(), "Test local workout plan"
+        );
+        GenAIResponse mockGenAIResponse = new GenAIResponse(mockDailyWorkout);
+        when(genaiLocalRestTemplate.exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(GenAIResponse.class)))
             .thenReturn(new ResponseEntity<>(mockGenAIResponse, HttpStatus.OK));
             
         // Mock repository save
@@ -172,8 +181,8 @@ class WorkoutPlanServiceTest {
 
         // Then
         assertNotNull(result);
-        verify(genaiLocalRestTemplate, times(1)).postForEntity(anyString(), any(), eq(String.class));
-        verify(genaiCloudRestTemplate, never()).postForEntity(anyString(), any(), eq(String.class));
+        verify(genaiLocalRestTemplate, times(1)).exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(GenAIResponse.class));
+        verify(genaiCloudRestTemplate, never()).exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(GenAIResponse.class));
         verify(dailyWorkoutRepository, times(1)).save(any(DailyWorkout.class));
     }
 
@@ -205,8 +214,11 @@ class WorkoutPlanServiceTest {
             .thenReturn(new ResponseEntity<>(mockUser, HttpStatus.OK));
             
         // Mock cloud GenAI service response
-        String mockGenAIResponse = "{\"workoutPlan\":{\"title\":\"Cloud AI Workout\",\"exercises\":[]}}";
-        when(genaiCloudRestTemplate.postForEntity(anyString(), any(), eq(String.class)))
+        GenAIDailyWorkout mockDailyWorkout = new GenAIDailyWorkout(
+            LocalDate.now().toString(), "STRENGTH", List.of(), "Test workout plan for null preference"
+        );
+        GenAIResponse mockGenAIResponse = new GenAIResponse(mockDailyWorkout);
+        when(genaiCloudRestTemplate.exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(GenAIResponse.class)))
             .thenReturn(new ResponseEntity<>(mockGenAIResponse, HttpStatus.OK));
             
         // Mock repository save
@@ -223,8 +235,8 @@ class WorkoutPlanServiceTest {
 
         // Then
         assertNotNull(result);
-        verify(genaiCloudRestTemplate, times(1)).postForEntity(anyString(), any(), eq(String.class));
-        verify(genaiLocalRestTemplate, never()).postForEntity(anyString(), any(), eq(String.class));
+        verify(genaiCloudRestTemplate, times(1)).exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(GenAIResponse.class));
+        verify(genaiLocalRestTemplate, never()).exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(GenAIResponse.class));
     }
 
     @Test
@@ -255,8 +267,11 @@ class WorkoutPlanServiceTest {
             .thenReturn(new ResponseEntity<>(mockUser, HttpStatus.OK));
             
         // Mock cloud GenAI service response
-        String mockGenAIResponse = "{\"workoutPlan\":{\"title\":\"Cloud AI Workout\",\"exercises\":[]}}";
-        when(genaiCloudRestTemplate.postForEntity(anyString(), any(), eq(String.class)))
+        GenAIDailyWorkout mockDailyWorkout = new GenAIDailyWorkout(
+            LocalDate.now().toString(), "STRENGTH", List.of(), "Test workout plan for invalid preference"
+        );
+        GenAIResponse mockGenAIResponse = new GenAIResponse(mockDailyWorkout);
+        when(genaiCloudRestTemplate.exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(GenAIResponse.class)))
             .thenReturn(new ResponseEntity<>(mockGenAIResponse, HttpStatus.OK));
             
         // Mock repository save
@@ -273,7 +288,7 @@ class WorkoutPlanServiceTest {
 
         // Then
         assertNotNull(result);
-        verify(genaiCloudRestTemplate, times(1)).postForEntity(anyString(), any(), eq(String.class));
-        verify(genaiLocalRestTemplate, never()).postForEntity(anyString(), any(), eq(String.class));
+        verify(genaiCloudRestTemplate, times(1)).exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(GenAIResponse.class));
+        verify(genaiLocalRestTemplate, never()).exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(GenAIResponse.class));
     }
 } 
