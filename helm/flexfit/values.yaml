@@ -1,20 +1,66 @@
-# Add your tumid here (required for TUM cluster deployment)
-tumid:
+# Default values for flexfit.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
 
-# Default values for flexfit
-global:
-  imageRegistry: "ghcr.io/aet-devops25/team-code-compass"
-  imageTag: "latest"
-  imagePullPolicy: Always
+replicaCount: 1
 
-# Service Registry (Eureka)
+image:
+  registry: ghcr.io/aet-devops25/team-code-compass
+  pullPolicy: IfNotPresent
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+
+securityContext: {}
+
+service:
+  type: ClusterIP
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: flexfit.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources: {}
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Service Registry Configuration
 serviceRegistry:
-  enabled: true
+  replicaCount: 1
   image:
     repository: ghcr.io/aet-devops25/team-code-compass/service-registry
-    tag: latest
-    pullPolicy: Always
-  replicaCount: 1
+    tag: "latest"
+    pullPolicy: IfNotPresent
   service:
     type: ClusterIP
     port: 8761
@@ -25,19 +71,17 @@ serviceRegistry:
     requests:
       cpu: 250m
       memory: 256Mi
-  env: []
 
-# API Gateway
+# API Gateway Configuration
 apiGateway:
-  enabled: true
+  replicaCount: 1
   image:
     repository: ghcr.io/aet-devops25/team-code-compass/api-gateway
-    tag: latest
-    pullPolicy: Always
-  replicaCount: 1
+    tag: "latest"
+    pullPolicy: IfNotPresent
   service:
     type: ClusterIP
-    port: 8000
+    port: 8080
   resources:
     limits:
       cpu: 500m
@@ -45,109 +89,108 @@ apiGateway:
     requests:
       cpu: 250m
       memory: 256Mi
-  env: []
 
-# User Service
+# User Service Configuration
 userService:
-  enabled: true
+  replicaCount: 1
   image:
     repository: ghcr.io/aet-devops25/team-code-compass/user-service
-    tag: latest
-    pullPolicy: Always
-  replicaCount: 1
+    tag: "latest"
+    pullPolicy: IfNotPresent
   service:
     type: ClusterIP
     port: 8081
   resources:
     limits:
       cpu: 500m
-      memory: 768Mi
+      memory: 512Mi
     requests:
       cpu: 250m
-      memory: 512Mi
-  env: []
+      memory: 256Mi
 
-# Workout Plan Service
+# Workout Plan Service Configuration
 workoutPlanService:
-  enabled: true
+  replicaCount: 1
   image:
     repository: ghcr.io/aet-devops25/team-code-compass/workout-plan-service
-    tag: latest
-    pullPolicy: Always
-  replicaCount: 1
+    tag: "latest"
+    pullPolicy: IfNotPresent
   service:
     type: ClusterIP
     port: 8082
   resources:
     limits:
       cpu: 500m
-      memory: 768Mi
+      memory: 512Mi
     requests:
       cpu: 250m
-      memory: 512Mi
-  env: []
+      memory: 256Mi
 
-# GenAI Worker
+# GenAI Worker Configuration (Cloud)
 genaiWorker:
-  enabled: true
+  replicaCount: 1
   image:
     repository: ghcr.io/aet-devops25/team-code-compass/genai-worker
-    tag: latest
-    pullPolicy: Always
-  replicaCount: 1
+    tag: "latest"
+    pullPolicy: IfNotPresent
   service:
     type: ClusterIP
-    port: 8000
-  env: 
-    - name: OPEN_WEBUI_BASE_URL
-      value: "https://gpu.aet.cit.tum.de"
-    - name: MODEL_NAME
-      value: "llama3.3:latest"
+    port: 8083
   resources:
     limits:
-      cpu: 1000m
-      memory: 1Gi
-    requests:
       cpu: 500m
       memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 256Mi
 
-# Frontend
-frontend:
-  enabled: true
-  image:
-    repository: ghcr.io/aet-devops25/team-code-compass/frontend
-    tag: latest
-    pullPolicy: Always
+# GenAI Worker Local Configuration
+genaiWorkerLocal:
   replicaCount: 1
+  image:
+    repository: ghcr.io/aet-devops25/team-code-compass/genai-worker-local
+    tag: "latest"
+    pullPolicy: IfNotPresent
   service:
     type: ClusterIP
-    port: 80
-  env:
-    - name: NEXT_PUBLIC_API_URL
-      value: "http://api-gateway:8000"
+    port: 8084
+  localModelType: "mock"
+  ollamaBaseUrl: "http://localhost:11434"
+  ollamaModel: "llama2"
+  gpt4allModelPath: "/app/models/ggml-gpt4all-j-v1.3-groovy.bin"
+  mockMode: "true"
   resources:
     limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
       cpu: 250m
+      memory: 256Mi
+
+# Frontend Configuration
+frontend:
+  replicaCount: 1
+  image:
+    repository: ghcr.io/aet-devops25/team-code-compass/frontend
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 3000
+  resources:
+    limits:
+      cpu: 300m
       memory: 256Mi
     requests:
       cpu: 100m
       memory: 128Mi
-  env: []
 
-# Ingress configuration
-ingress:
-  enabled: true
-  className: "nginx"
-  annotations:
-    cert-manager.io/cluster-issuer: "letsencrypt-prod"
-    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
-  tls: true
-
-# PostgreSQL configuration
+# PostgreSQL Configuration
 postgres:
+  replicaCount: 1
   image:
-    repository: postgres
-    tag: "13-alpine"
+    repository: quay.io/sclorg/postgresql-13-c8s
+    tag: "latest"
     pullPolicy: IfNotPresent
   password: flexfit123  # Override in production
   persistence:
@@ -164,3 +207,57 @@ postgres:
 
 # Chair API Key for GenAI worker
 chairApiKey: ""  # Set via --set or values file
+
+# Monitoring Configuration
+monitoring:
+  prometheus:
+    enabled: true
+    image:
+      repository: prom/prometheus
+      tag: "latest"
+      pullPolicy: IfNotPresent
+    service:
+      type: ClusterIP
+      port: 9090
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 250m
+        memory: 256Mi
+
+  grafana:
+    enabled: true
+    image:
+      repository: grafana/grafana
+      tag: "latest"
+      pullPolicy: IfNotPresent
+    service:
+      type: ClusterIP
+      port: 3001
+    adminPassword: "admin"
+    resources:
+      limits:
+        cpu: 300m
+        memory: 256Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+
+  alertmanager:
+    enabled: true
+    image:
+      repository: prom/alertmanager
+      tag: "latest"
+      pullPolicy: IfNotPresent
+    service:
+      type: ClusterIP
+      port: 9093
+    resources:
+      limits:
+        cpu: 200m
+        memory: 128Mi
+      requests:
+        cpu: 100m
+        memory: 64Mi

@@ -1,5 +1,5 @@
-# TUM Student Cluster specific values - DEVELOPMENT ENVIRONMENT
-# Usage: source .env && envsubst < values-tum.yaml | helm install flexfit . -f - --namespace team-code-compass-development
+# TUM Student Cluster specific values - PRODUCTION ENVIRONMENT
+# Usage: source .env && envsubst < values-tum-production.yaml | helm install flexfit . -f - --namespace team-code-compass-production
 
 # REQUIRED: Set your TUM ID here (from environment variable)
 tumid: "${TUM_ID}"
@@ -9,7 +9,7 @@ chairApiKey: "${CHAIR_API_KEY}"
 postgres:
   password: "${POSTGRES_PASSWORD}"
 
-# Use latest image tags from GHCR (most recent builds for development/staging)
+# Use IMAGE_TAG from environment (typically "main" for production, but flexible)
 serviceRegistry:
   image:
     tag: "${IMAGE_TAG}"
@@ -38,13 +38,13 @@ frontend:
   image:
     tag: "${IMAGE_TAG}"
 
-# Enable monitoring stack
+# Enable monitoring stack for production
 monitoring:
   prometheus:
     enabled: true
   grafana:
     enabled: true
-    adminPassword: "${GRAFANA_ADMIN_PASSWORD:-admin}"
+    adminPassword: "${GRAFANA_ADMIN_PASSWORD}"
   alertmanager:
     enabled: true
 
@@ -54,4 +54,4 @@ ingress:
   className: "nginx"
   tls: true
   annotations:
-    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod" 

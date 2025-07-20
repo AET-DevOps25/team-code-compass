@@ -51,13 +51,13 @@ spec:
             memory: {{ .Values.workoutPlanService.resources.requests.memory }}
         livenessProbe:
           httpGet:
-            path: /health
+            path: /actuator/health
             port: 8082
           initialDelaySeconds: 120
           periodSeconds: 30
         readinessProbe:
           httpGet:
-            path: /health
+            path: /actuator/health
             port: 8082
           initialDelaySeconds: 90
           periodSeconds: 10
