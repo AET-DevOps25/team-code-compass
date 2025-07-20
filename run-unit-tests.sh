@@ -105,8 +105,21 @@ else
     FAILED_SERVICES+=("Service Registry")
 fi
 
-# 5. GenAI Worker Unit Tests
-echo -e "\n${BLUE}5. GenAI Worker Unit Tests${NC}"
+# 5. TTS Service Unit Tests
+echo -e "\n${BLUE}5. TTS Service Unit Tests${NC}"
+TOTAL_TESTS=$((TOTAL_TESTS + 1))
+
+if run_test_suite "TTS Service" \
+    "server/tts-service" \
+    "./mvnw test -Dspring.profiles.active=test -Dmaven.test.failure.ignore=true" \
+    "TTS Service (Spring Boot + JUnit 5)"; then
+    PASSED_TESTS=$((PASSED_TESTS + 1))
+else
+    FAILED_SERVICES+=("TTS Service")
+fi
+
+# 6. GenAI Worker Unit Tests
+echo -e "\n${BLUE}6. GenAI Worker Unit Tests${NC}"
 TOTAL_TESTS=$((TOTAL_TESTS + 1))
 
 if run_test_suite "GenAI Worker" \

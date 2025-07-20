@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useWorkout, useWorkoutGeneration } from '../hooks/useWorkout';
+import { useTts } from '../hooks/useTts';
 import { SportType } from '../types/workout';
 import { workoutService, WeeklyWorkoutGenerationOptions } from '../services/workoutService';
 
@@ -21,11 +22,27 @@ export function WorkoutDashboard() {
     clearError: clearGenerationError
   } = useWorkoutGeneration();
 
+  const {
+    isGenerating: isGeneratingAudio,
+    isSynthesizing,
+    error: ttsError,
+    audioUrl,
+    audioBlob,
+    availableVoices,
+    isLoadingVoices,
+    generateAudio,
+    synthesizeAudio,
+    loadAvailableVoices,
+    clearError: clearTtsError,
+    clearAudio
+  } = useTts();
+
   const [selectedSport, setSelectedSport] = useState<SportType>(SportType.STRENGTH);
   const [duration, setDuration] = useState(30);
   const [customPrompt, setCustomPrompt] = useState('');
   const [isGeneratingWeekly, setIsGeneratingWeekly] = useState(false);
   const [weeklyWorkouts, setWeeklyWorkouts] = useState<any[]>([]);
+  const [selectedVoice, setSelectedVoice] = useState<string>('en-US-Neural2-F');
 
   const handleGenerateWorkout = async () => {
     clearGenerationError();
@@ -76,6 +93,42 @@ export function WorkoutDashboard() {
     await getWorkoutHistory();
   };
 
+  const handleGenerateAudio = async () => {
+    if (!currentWorkout?.markdownContent) {
+      return;
+    }
+
+    // Convert markdown to plain text for TTS
+    const plainText = currentWorkout.markdownContent
+      .replace(/[#*`]/g, '') // Remove markdown formatting
+      .replace(/\n+/g, ' ') // Replace newlines with spaces
+      .trim();
+
+    if (!plainText) {
+      return;
+    }
+
+    await synthesizeAudio({
+      text: plainText,
+      voiceName: selectedVoice,
+      languageCode: 'en-US',
+      audioEncoding: 'MP3'
+    });
+  };
+
+  const handleDownloadAudio = () => {
+    if (audioBlob) {
+      const url = URL.createObjectURL(audioBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `workout-voice-over-${new Date().toISOString().split('T')[0]}.mp3`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+  };
+
   return (
     <div className="p-6 max-w-6xl mx-auto">
       <h1 className="text-3xl font-bold mb-6">Workout Dashboard</h1>
@@ -109,9 +162,23 @@ export function WorkoutDashboard() {
         </div>
       )}
 
+      {ttsError && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          <div className="flex justify-between items-center">
+            <span>{ttsError}</span>
+            <button 
+              onClick={clearTtsError}
+              className="text-red-700 hover:text-red-900"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Workout Generation Section */}
       <div className="bg-white shadow-md rounded-lg p-6 mb-6">
-        <h2 className="text-xl font-semibold mb-4">Generate Workouts</h2>
+        <h2 className="text-xl font-semibold mb-4">AI Workout Assistant</h2>
         
         {/* Basic Settings */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -180,6 +247,56 @@ export function WorkoutDashboard() {
             {isGeneratingWeekly ? 'Generating Weekly...' : 'Generate Weekly Plan'}
           </button>
         </div>
+      </div>
+
+      {/* Workout Voice-Over Section */}
+      <div className="bg-white shadow-md rounded-lg p-6 mb-6">
+        <h2 className="text-xl font-semibold mb-4">Workout Voice-Over</h2>
+        
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Voice Selection
+          </label>
+          <select
+            value={selectedVoice}
+            onChange={(e) => setSelectedVoice(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="en-US-Neural2-F">Female Voice (US)</option>
+            <option value="en-US-Neural2-M">Male Voice (US)</option>
+            <option value="en-US-Neural2-A">Neutral Voice (US)</option>
+          </select>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <button
+            onClick={handleGenerateAudio}
+            disabled={isGeneratingAudio || isSynthesizing || !currentWorkout?.markdownContent}
+            className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 text-white font-medium py-3 px-4 rounded-md transition-colors"
+          >
+            {isGeneratingAudio || isSynthesizing ? 'Generating Audio...' : 'Generate Voice-Over'}
+          </button>
+          
+          {audioUrl && (
+            <button
+              onClick={handleDownloadAudio}
+              className="w-full bg-orange-600 hover:bg-orange-700 text-white font-medium py-3 px-4 rounded-md transition-colors"
+            >
+              Download Audio
+            </button>
+          )}
+        </div>
+
+        {/* Audio Player */}
+        {audioUrl && (
+          <div className="mt-4 p-4 bg-gray-50 rounded-md">
+            <h3 className="font-medium mb-2">Audio Preview:</h3>
+            <audio controls className="w-full">
+              <source src={audioUrl} type="audio/mpeg" />
+              Your browser does not support the audio element.
+            </audio>
+          </div>
+        )}
       </div>
 
       {/* Weekly Workouts Display */}

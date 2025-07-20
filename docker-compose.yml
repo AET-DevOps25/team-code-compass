@@ -89,6 +89,25 @@ services:
       timeout: 10s
       retries: 3
 
+  # TTS Service
+  tts-service:
+    build: ./server/tts-service
+    container_name: flexfit-tts-service
+    ports:
+      - "8083:8083"
+    depends_on:
+      - service-registry
+    networks:
+      - flexfit-network
+    environment:
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://service-registry:8761/eureka
+      - GOOGLE_APPLICATION_CREDENTIALS_JSON=${GOOGLE_APPLICATION_CREDENTIALS_JSON}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/api/tts/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   # GenAI Workout Worker (Open WebUI)
   genai-workout-worker:
     build: ./genai
@@ -114,7 +133,7 @@ services:
     build: ./client
     container_name: flexfit-frontend
     ports:
-      - "3000:80"
+      - "3000:3000"
     depends_on:
       - api-gateway
     networks:
@@ -122,7 +141,7 @@ services:
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8080
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
       interval: 30s
       timeout: 10s
       retries: 3

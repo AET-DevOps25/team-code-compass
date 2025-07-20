@@ -111,6 +111,26 @@ genaiWorker:
       cpu: 500m
       memory: 512Mi
 
+# TTS Service
+ttsService:
+  enabled: true
+  image:
+    repository: ghcr.io/aet-devops25/team-code-compass/tts-service
+    tag: latest
+    pullPolicy: Always
+  replicaCount: 1
+  service:
+    type: ClusterIP
+    port: 8083
+  resources:
+    limits:
+      cpu: 500m
+      memory: 768Mi
+    requests:
+      cpu: 250m
+      memory: 512Mi
+  env: []
+
 # Frontend
 frontend:
   enabled: true
@@ -164,3 +184,6 @@ postgres:
 
 # Chair API Key for GenAI worker
 chairApiKey: ""  # Set via --set or values file
+
+# Google Cloud Credentials for TTS Service
+googleCredentials: ""  # Set via --set or values file (base64 encoded)

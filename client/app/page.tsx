@@ -38,6 +38,7 @@ import { useAuth } from "../src/hooks/useAuth"
 import { Gender } from "../src/types/user"
 import { workoutService } from "../src/services/workoutService"
 import { SportType as WorkoutServiceSportType } from "../src/types/workout"
+import { useTts } from "../src/hooks/useTts"
 
 // Types and Enums
 enum FitnessGoal {
@@ -170,6 +171,23 @@ export default function FlexFitApp() {
     type: 'success' | 'error'
     message: string
   } | null>(null)
+
+  // TTS state
+  const {
+    isGenerating: isGeneratingAudio,
+    isSynthesizing,
+    error: ttsError,
+    audioUrl,
+    audioBlob,
+    availableVoices,
+    isLoadingVoices,
+    generateAudio,
+    synthesizeAudio,
+    loadAvailableVoices,
+    clearError: clearTtsError,
+    clearAudio
+  } = useTts()
+  const [selectedVoice, setSelectedVoice] = useState<string>('en-US-Neural2-F')
 
   // Function to load workouts from backend
   const loadWorkouts = useCallback(async () => {
@@ -762,6 +780,43 @@ export default function FlexFitApp() {
     }
 
     setChatInput("")
+  }
+
+  // TTS handlers
+  const handleGenerateAudio = async () => {
+    if (!currentWorkout?.content) {
+      return
+    }
+
+    // Convert markdown to plain text for TTS
+    const plainText = currentWorkout.content
+      .replace(/[#*`]/g, '') // Remove markdown formatting
+      .replace(/\n+/g, ' ') // Replace newlines with spaces
+      .trim()
+
+    if (!plainText) {
+      return
+    }
+
+    await synthesizeAudio({
+      text: plainText,
+      voiceName: selectedVoice,
+      languageCode: 'en-US',
+      audioEncoding: 'MP3'
+    })
+  }
+
+  const handleDownloadAudio = () => {
+    if (audioBlob) {
+      const url = URL.createObjectURL(audioBlob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `workout-voice-over-${new Date().toISOString().split('T')[0]}.mp3`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    }
   }
 
   const getWorkoutSuggestion = (): string => {
@@ -2036,6 +2091,83 @@ export default function FlexFitApp() {
                         <Send className="h-4 w-4" />
                       </Button>
                     </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Workout Voice-Over Section */}
+              <Card className="bg-white/80 backdrop-blur-sm">
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <Play className="h-5 w-5" />
+                    <span>Workout Voice-Over</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {/* Voice Selection */}
+                    <div>
+                      <Label className="text-xs">Voice Selection</Label>
+                      <Select
+                        value={selectedVoice}
+                        onValueChange={(value) => setSelectedVoice(value)}
+                      >
+                        <SelectTrigger className="h-8">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="en-US-Neural2-F">Female Voice (US)</SelectItem>
+                          <SelectItem value="en-US-Neural2-M">Male Voice (US)</SelectItem>
+                          <SelectItem value="en-US-Neural2-A">Neutral Voice (US)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* TTS Error Display */}
+                    {ttsError && (
+                      <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+                        <div className="flex justify-between items-center">
+                          <span>{ttsError}</span>
+                          <button 
+                            onClick={clearTtsError}
+                            className="text-red-700 hover:text-red-900"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* TTS Buttons */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <Button
+                        onClick={handleGenerateAudio}
+                        disabled={isGeneratingAudio || isSynthesizing || !currentWorkout?.content}
+                        className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 text-white font-medium py-3 px-4 rounded-md transition-colors"
+                      >
+                        {isGeneratingAudio || isSynthesizing ? 'Generating Audio...' : 'Generate Voice-Over'}
+                      </Button>
+                      
+                      {audioUrl && (
+                        <Button
+                          onClick={handleDownloadAudio}
+                          className="w-full bg-orange-600 hover:bg-orange-700 text-white font-medium py-3 px-4 rounded-md transition-colors"
+                        >
+                          Download Audio
+                        </Button>
+                      )}
+                    </div>
+
+                    {/* Audio Player */}
+                    {audioUrl && (
+                      <div className="mt-4 p-4 bg-gray-50 rounded-md">
+                        <h3 className="font-medium mb-2">Audio Preview:</h3>
+                        <audio controls className="w-full">
+                          <source src={audioUrl} type="audio/mpeg" />
+                          Your browser does not support the audio element.
+                        </audio>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>

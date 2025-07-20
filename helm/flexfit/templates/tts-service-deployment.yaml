@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "flexfit.fullname" . }}-tts-service
+  labels:
+    {{- include "flexfit.labels" . | nindent 4 }}
+    app.kubernetes.io/component: tts-service
+spec:
+  replicas: {{ .Values.ttsService.replicaCount | default 1 }}
+  selector:
+    matchLabels:
+      {{- include "flexfit.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: tts-service
+  template:
+    metadata:
+      labels:
+        {{- include "flexfit.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: tts-service
+    spec:
+      containers:
+        - name: tts-service
+          image: {{ .Values.ttsService.image.repository }}:{{ .Values.ttsService.image.tag | default .Chart.AppVersion }}
+          imagePullPolicy: {{ .Values.ttsService.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - name: http
+              containerPort: 8083
+              protocol: TCP
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: "docker"
+            - name: SERVER_PORT
+              value: "8083"
+            - name: EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE
+              value: "http://{{ include "flexfit.fullname" . }}-service-registry:8761/eureka"
+            - name: EUREKA_INSTANCE_PREFER_IP_ADDRESS
+              value: "true"
+            - name: EUREKA_INSTANCE_IP_ADDRESS
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: GOOGLE_APPLICATION_CREDENTIALS_JSON
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "flexfit.fullname" . }}-google-credentials
+                  key: credentials.json
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "flexfit.fullname" . }}-secrets
+                  key: jwt-secret
+          resources:
+            {{- toYaml .Values.ttsService.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+ 

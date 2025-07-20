@@ -59,6 +59,20 @@ services:
     networks:
       - flexfit-network
 
+  tts-service:
+    image: ghcr.io/aet-devops25/team-code-compass/tts-service:{{ image_tag }}
+    ports:
+      - "8083:8083"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-registry:8761/eureka/
+      - GOOGLE_APPLICATION_CREDENTIALS_JSON={{ google_credentials_json }}
+    depends_on:
+      - service-registry
+    restart: unless-stopped
+    networks:
+      - flexfit-network
+
   genai-worker:
     image: ghcr.io/aet-devops25/team-code-compass/genai-worker:{{ image_tag }}
     environment:

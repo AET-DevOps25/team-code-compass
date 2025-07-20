@@ -1,0 +1,79 @@
+groups:
+  - name: flexfit-tts-service
+    rules:
+      # TTS Service Down Alert
+      - alert: TTSServiceDown
+        expr: up{job="tts-service-metrics"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: tts
+        annotations:
+          summary: "TTS Service is down"
+          description: "TTS Service has been down for more than 1 minute"
+
+      # High Error Rate Alert
+      - alert: TTSServiceHighErrorRate
+        expr: (rate(tts_audio_generation_errors_total[5m]) + rate(tts_voice_synthesis_errors_total[5m])) / (rate(tts_audio_generation_requests_total[5m]) + rate(tts_voice_synthesis_requests_total[5m])) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+          service: tts
+        annotations:
+          summary: "TTS Service high error rate"
+          description: "TTS Service error rate is above 10% for more than 2 minutes"
+
+      # High Latency Alert
+      - alert: TTSServiceHighLatency
+        expr: histogram_quantile(0.95, rate(tts_audio_generation_duration_seconds_bucket[5m])) > 10
+        for: 2m
+        labels:
+          severity: warning
+          service: tts
+        annotations:
+          summary: "TTS Service high latency"
+          description: "TTS Service 95th percentile latency is above 10 seconds"
+
+      # Voice Synthesis High Latency Alert
+      - alert: TTSVoiceSynthesisHighLatency
+        expr: histogram_quantile(0.95, rate(tts_voice_synthesis_duration_seconds_bucket[5m])) > 15
+        for: 2m
+        labels:
+          severity: warning
+          service: tts
+        annotations:
+          summary: "TTS Voice Synthesis high latency"
+          description: "TTS Voice Synthesis 95th percentile latency is above 15 seconds"
+
+      # No Requests Alert
+      - alert: TTSServiceNoRequests
+        expr: rate(tts_audio_generation_requests_total[10m]) == 0 and rate(tts_voice_synthesis_requests_total[10m]) == 0
+        for: 5m
+        labels:
+          severity: info
+          service: tts
+        annotations:
+          summary: "TTS Service no requests"
+          description: "TTS Service has received no requests in the last 10 minutes"
+
+      # High Request Rate Alert
+      - alert: TTSServiceHighRequestRate
+        expr: rate(tts_audio_generation_requests_total[5m]) + rate(tts_voice_synthesis_requests_total[5m]) > 10
+        for: 1m
+        labels:
+          severity: info
+          service: tts
+        annotations:
+          summary: "TTS Service high request rate"
+          description: "TTS Service is receiving more than 10 requests per second"
+
+      # Health Check Failures Alert
+      - alert: TTSServiceHealthCheckFailures
+        expr: rate(tts_health_check_requests_total[5m]) == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: tts
+        annotations:
+          summary: "TTS Service health check failures"
+          description: "TTS Service health check endpoint is not responding" 
