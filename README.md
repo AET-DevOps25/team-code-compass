@@ -8,7 +8,7 @@ A comprehensive microservices-based fitness application featuring AI-powered wor
 - **[System Overview](docs/system_overview.md)**
 - **[CI/CD Pipeline Guide](docs/CI_CD_GUIDE.md)**
 
-## 📋 Table of Contents
+## 📋 Table of Contentsß
 
 - [🏗️ Architecture Overview](#️-architecture-overview)
 - [👥 Team & Responsibilities](#-team--responsibilities)
@@ -39,17 +39,7 @@ A comprehensive microservices-based fitness application featuring AI-powered wor
 | **CI/CD** | GitHub Actions | Automated testing and deployment |
 | **Monitoring** | Prometheus, Grafana | System observability and metrics |
 
-## 👥 Team & Responsibilities
 
-### 🎯 Student Assignment Mapping
-
-| Student | Primary Services | Responsibilities | Technologies |
-|---------|------------------|------------------|--------------|
-| **Student A** | Frontend + API Gateway | UI/UX development, API routing, CORS handling | Next.js, TypeScript, Spring Cloud Gateway |
-| **Student B** | User Service + Auth | User management, authentication, profiles | Spring Boot, JPA, PostgreSQL, JWT |
-| **Student C** | Workout Service + Integration | Workout planning, service orchestration | Spring Boot, Microservices Architecture |
-| **Student D** | GenAI Worker + AI Integration | AI workout generation, Python services | Python, FastAPI, LangChain, AI/ML |
-| **Student E** | DevOps + Monitoring | CI/CD, containerization, monitoring setup | Docker, GitHub Actions, Prometheus, Grafana |
 
 
 ## 🚀 Quick Setup (≤3 Commands)
