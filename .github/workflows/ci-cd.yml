@@ -358,10 +358,21 @@ jobs:
 
       - name: 🔑 Configure Kubernetes context
         run: |
-          # Note: In real deployment, kubeconfig would be stored as GitHub secret
-          echo "Setting up Kubernetes context for TUM cluster"
-          echo "KUBECONFIG would be loaded from secrets in production"
+          echo "🔧 Setting up TUM Kubernetes cluster access..."
           
+          # Create .kube directory
+          mkdir -p ~/.kube
+          
+          # Write kubeconfig from GitHub secret
+          echo "${{ secrets.TUM_KUBECONFIG }}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+          
+          # Verify connection
+          kubectl config current-context
+          kubectl version --client
+          
+          echo "✅ Connected to TUM Kubernetes cluster"
+
       - name: 🌍 Set deployment environment
         id: env
         run: |
@@ -396,6 +407,13 @@ jobs:
           export POSTGRES_PASSWORD="${{ secrets.POSTGRES_PASSWORD }}"
           export GRAFANA_ADMIN_PASSWORD="${{ secrets.GRAFANA_ADMIN_PASSWORD }}"
           
+          # Email alerts (optional)
+          export ALERT_EMAIL_FROM="${{ secrets.ALERT_EMAIL_FROM || 'hakanduranyt@gmail.com' }}"
+          export ALERT_EMAIL_TO="${{ secrets.ALERT_EMAIL_TO || 'hakanduranyt@gmail.com' }}"
+          export ALERT_EMAIL_USERNAME="${{ secrets.ALERT_EMAIL_USERNAME || 'hakanduranyt@gmail.com' }}"
+          export ALERT_EMAIL_PASSWORD="${{ secrets.ALERT_EMAIL_PASSWORD || 'your_gmail_app_password_here' }}"
+          export SMTP_HOST="${{ secrets.SMTP_HOST || 'smtp.gmail.com:587' }}"
+          
           # Set IMAGE_TAG based on branch
           if [[ "${{ needs.setup.outputs.is_main }}" == "true" ]]; then
             export IMAGE_TAG="main"
@@ -412,6 +430,11 @@ jobs:
             echo "  - CHAIR_API_KEY" 
             echo "  - POSTGRES_PASSWORD"
             echo "  - GRAFANA_ADMIN_PASSWORD"
+            echo ""
+            echo "📋 Optional TUM Kubernetes secrets:"
+            echo "  - TUM_KUBECONFIG (base64 encoded kubeconfig)"
+            echo "  - TUM_NAMESPACE (e.g., ge85zat-devops25)"  
+            echo "  - TUM_INGRESS_HOST (e.g., ge85zat-devops25.student.k8s.aet.cit.tum.de)"
             exit 1
           fi
           
@@ -448,21 +471,24 @@ jobs:
             echo "- $line" >> $GITHUB_STEP_SUMMARY
           done
 
-  # Job 6: Summary (Updated dependencies)
+  # Job 6: Pipeline Summary
   summary:
-    name: 📊 Pipeline Summary  
+    name: 📊 Pipeline Summary
     runs-on: ubuntu-latest
     needs: [setup, unit-tests, integration-tests, build-and-push-ghcr, deploy-to-kubernetes]
     if: always()
     steps:
-      - name: 📊 Display Results Summary
+      - name: 📊 Pipeline Results
         run: |
-          echo "🔍 ==========================="
-          echo "📊 FLEXFIT CI/CD SUMMARY"
-          echo "🔍 ==========================="
-          echo "  📋 Setup: ${{ needs.setup.result }}"
-          echo "  🧪 Unit Tests: ${{ needs.unit-tests.result }}"
-          echo "  🔧 Integration Tests: ${{ needs.integration-tests.result || 'skipped' }}"
+          echo "📊 FlexFit CI/CD Pipeline Results"
+          echo "=================================="
+          echo "Event: ${{ github.event_name }}"
+          echo "Branch: ${{ needs.setup.outputs.target_branch }}"
+          echo "Is PR: ${{ needs.setup.outputs.is_pr }}"
+          echo ""
+          echo "Test Results:"
+          echo "  🧪 Unit Tests: ${{ needs.unit-tests.result || 'skipped' }}"
+          echo "  🔗 Integration Tests: ${{ needs.integration-tests.result || 'skipped' }}"
           echo "  🐳 GHCR Push: ${{ needs.build-and-push-ghcr.result || 'skipped' }}"
           echo "  🚀 Kubernetes Deploy: ${{ needs.deploy-to-kubernetes.result || 'skipped' }}"
-          echo "🔍 ===========================" 
+          echo "" 
