@@ -4,17 +4,84 @@ spring:
   cloud:
     gateway:
       routes:
+        # User service routes - handle /api/v1/users/** directly
         - id: user-service
           uri: lb://user-service
           predicates:
-            - Path=/api/users/**
-          filters:
-            - StripPrefix=1
+            - Path=/api/v1/users/**
+        
+        # Auth service routes - route /auth/** to user service
+        - id: auth-service
+          uri: lb://user-service
+          predicates:
+            - Path=/auth/**
 
+        # Workout plan service routes - handle /api/v1/plans/** directly
         - id: workout-plan-service
           uri: lb://workout-plan-service
           predicates:
-            - Path=/api/workout-plans/**
+            - Path=/api/v1/plans/**
+
+        # User service routes via service discovery path
+        - id: user-service-discovery
+          uri: lb://user-service
+          predicates:
+            - Path=/user-service/**
+          filters:
+            - RewritePath=/user-service/(?<segment>.*), /${segment}
+
+        # Workout plan service routes via service discovery path
+        - id: workout-plan-service-discovery
+          uri: lb://workout-plan-service
+          predicates:
+            - Path=/workout-plan-service/**
+          filters:
+            - RewritePath=/workout-plan-service/(?<segment>.*), /${segment}
+
+        # Swagger UI for user service - with proper configuration
+        - id: user-service-swagger-ui
+          uri: lb://user-service
+          predicates:
+            - Path=/user-service/swagger-ui/**
+          filters:
+            - StripPrefix=1
+
+        # Swagger UI for workout plan service - with proper configuration  
+        - id: workout-plan-service-swagger-ui
+          uri: lb://workout-plan-service
+          predicates:
+            - Path=/workout-plan-service/swagger-ui/**
+          filters:
+            - StripPrefix=1
+
+        # API docs for user service - with proper path handling
+        - id: user-service-v3-api-docs
+          uri: lb://user-service
+          predicates:
+            - Path=/user-service/v3/api-docs/**
+          filters:
+            - StripPrefix=1
+
+        # API docs for workout plan service - with proper path handling
+        - id: workout-plan-service-v3-api-docs
+          uri: lb://workout-plan-service
+          predicates:
+            - Path=/workout-plan-service/v3/api-docs/**
+          filters:
+            - StripPrefix=1
+
+        # Webjars support for Swagger UI assets
+        - id: user-service-webjars
+          uri: lb://user-service
+          predicates:
+            - Path=/user-service/webjars/**
+          filters:
+            - StripPrefix=1
+
+        - id: workout-plan-service-webjars
+          uri: lb://workout-plan-service
+          predicates:
+            - Path=/workout-plan-service/webjars/**
           filters:
             - StripPrefix=1
 
@@ -26,7 +93,7 @@ spring:
           filters:
             - StripPrefix=2
             - RewritePath=/docs/users/(?<remaining>.*), /${remaining}
-            - AddRequestHeader=X-Forwarded-Host, localhost:8000
+            - AddRequestHeader=X-Forwarded-Host, localhost:8080
             - AddRequestHeader=X-Forwarded-Proto, http
             - AddRequestHeader=X-Forwarded-Prefix, /docs/users
 
@@ -37,13 +104,32 @@ spring:
           filters:
             - StripPrefix=2
             - RewritePath=/docs/workout-plans/(?<remaining>.*), /${remaining}
-            - AddRequestHeader=X-Forwarded-Host, localhost:8000
+            - AddRequestHeader=X-Forwarded-Host, localhost:8080
             - AddRequestHeader=X-Forwarded-Proto, http
             - AddRequestHeader=X-Forwarded-Prefix, /docs/workout-plans
+            
+        # API docs routes
+        - id: user-service-api-docs
+          uri: lb://user-service
+          predicates:
+            - Path=/docs/users/v3/api-docs/**
+          filters:
+            - StripPrefix=2
+            - AddRequestHeader=X-Forwarded-Host, localhost:8080
+            - AddRequestHeader=X-Forwarded-Proto, http
+            
+        - id: workout-plan-service-api-docs
+          uri: lb://workout-plan-service
+          predicates:
+            - Path=/docs/workout-plans/v3/api-docs/**
+          filters:
+            - StripPrefix=2
+            - AddRequestHeader=X-Forwarded-Host, localhost:8080
+            - AddRequestHeader=X-Forwarded-Proto, http
 
       discovery:
         locator:
-          enabled: true
+          enabled: false
           lower-case-service-id: true
 
 server:
@@ -62,4 +148,17 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,gateway 
+        include: health,info,gateway,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+    metrics:
+      enabled: true
+    prometheus:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    tags:
+      application: ${spring.application.name} 

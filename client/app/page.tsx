@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -34,6 +34,12 @@ import {
   Moon,
 } from "lucide-react"
 import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
+import { useAuth } from "../src/hooks/useAuth"
+import { Gender } from "../src/types/user"
+import { workoutService } from "../src/services/workoutService"
+import { SportType as WorkoutServiceSportType } from "../src/types/workout"
+import { formatDateForAPI, getTodayLocalDate } from "../src/utils/dateUtils"
 
 // Types and Enums
 enum FitnessGoal {
@@ -61,6 +67,7 @@ enum WorkoutType {
   CROSSFIT = "CrossFit",
   SWIMMING = "Swimming",
   RUNNING = "Running",
+  REST = "Rest Day",
 }
 
 enum Equipment {
@@ -70,12 +77,7 @@ enum Equipment {
   FULL_GYM = "Full Gym Access",
 }
 
-enum TimePreference {
-  MORNING = "Morning (6-10 AM)",
-  AFTERNOON = "Afternoon (12-4 PM)",
-  EVENING = "Evening (6-9 PM)",
-  FLEXIBLE = "Flexible",
-}
+
 
 enum IntensityLevel {
   LOW = "Low",
@@ -93,14 +95,7 @@ enum BodyFocus {
   LEGS = "Legs",
 }
 
-enum DietaryPreference {
-  NONE = "No Restrictions",
-  VEGETARIAN = "Vegetarian",
-  VEGAN = "Vegan",
-  KETO = "Keto",
-  PALEO = "Paleo",
-  MEDITERRANEAN = "Mediterranean",
-}
+
 
 enum WorkoutStatus {
   COMPLETED = "completed",
@@ -114,10 +109,8 @@ interface UserPreferences {
   experienceLevel: ExperienceLevel
   preferredWorkouts: WorkoutType[]
   equipment: Equipment
-  timePreference: TimePreference
   intensityLevel: IntensityLevel
   bodyFocus: BodyFocus
-  dietaryPreference: DietaryPreference
   age: number
   workoutDuration: number
   workoutsPerWeek: number
@@ -143,7 +136,7 @@ interface ChatMessage {
 }
 
 export default function FlexFitApp() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const { user, isAuthenticated, isLoading, logout } = useAuth()
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date())
   const [currentWorkout, setCurrentWorkout] = useState<WorkoutSession | null>(null)
@@ -154,498 +147,162 @@ export default function FlexFitApp() {
     experienceLevel: ExperienceLevel.BEGINNER,
     preferredWorkouts: [WorkoutType.STRENGTH, WorkoutType.CARDIO],
     equipment: Equipment.BASIC,
-    timePreference: TimePreference.EVENING,
     intensityLevel: IntensityLevel.MODERATE,
     bodyFocus: BodyFocus.FULL_BODY,
-    dietaryPreference: DietaryPreference.NONE,
     age: 25,
     workoutDuration: 45,
     workoutsPerWeek: 3,
   })
+  
+  // Dynamic workout sessions state
+  const [workoutSessions, setWorkoutSessions] = useState<Record<string, WorkoutSession>>({})
+  const [isLoadingWorkouts, setIsLoadingWorkouts] = useState(false)
+  const [workoutError, setWorkoutError] = useState<string | null>(null)
 
-  const workoutSessions: Record<string, WorkoutSession> = {
-    // Past completed workouts (Green) - Recent past dates
-    "2025-01-08": {
-      id: "1",
-      name: "Full Body Strength",
-      type: WorkoutType.STRENGTH,
-      duration: 45,
+  // Workout generation state
+  const [customPrompt, setCustomPrompt] = useState("")
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [generationStatus, setGenerationStatus] = useState<{
+    type: 'success' | 'error'
+    message: string
+  } | null>(null)
+
+  // NEW: LLM Selection State
+  const [llmPreference, setLlmPreference] = useState<'cloud' | 'local_ollama' | 'local_gpt4all'>('cloud')
+  const [availableCapabilities, setAvailableCapabilities] = useState<{
+    llm_types: string[];
+    rag_enabled: boolean;
+    vector_databases: string[];
+  } | null>(null)
+  const [isLoadingCapabilities, setIsLoadingCapabilities] = useState(false)
+
+  // Function to load workouts from backend
+  const loadWorkouts = useCallback(async () => {
+    if (!user?.id) return
+
+    setIsLoadingWorkouts(true)
+    setWorkoutError(null)
+
+    try {
+      // Get workouts for current month
+      const startDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1)
+      const endDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0)
+      
+      const response = await workoutService.getMyWorkoutsByDateRange({
+        startDate: formatDateForAPI(startDate),
+        endDate: formatDateForAPI(endDate)
+      }, user.id)
+
+      if (response.error) {
+        setWorkoutError(response.error.error)
+        return
+      }
+
+      const workouts = response.data || []
+      const workoutMap: Record<string, WorkoutSession> = {}
+
+      // Convert backend workouts to frontend format
+      workouts.forEach(workout => {
+        const sportTypeMap: Record<string, WorkoutType> = {
+          'STRENGTH': WorkoutType.STRENGTH,
+          'HIIT': WorkoutType.HIIT,
+          'YOGA_MOBILITY': WorkoutType.YOGA,
+          'RUNNING_INTERVALS': WorkoutType.RUNNING,
+          'REST': WorkoutType.REST
+        }
+
+        const statusMap: Record<string, WorkoutStatus> = {
+          'COMPLETED': WorkoutStatus.COMPLETED,
+          'PENDING': WorkoutStatus.PLANNED,
+          'IN_PROGRESS': WorkoutStatus.PLANNED,
+          'SKIPPED': WorkoutStatus.NONE
+        }
+
+        workoutMap[workout.dayDate] = {
+          id: workout.id,
+          name: workout.focusSportTypeForTheDay === 'REST' ? 'Rest Day' : `${workout.focusSportTypeForTheDay.replace('_', ' ')} Training`,
+          type: sportTypeMap[workout.focusSportTypeForTheDay] || WorkoutType.STRENGTH,
+          duration: workout.scheduledExercises?.reduce((total, exercise) => {
+            const match = exercise.prescribedSetsRepsDuration.match(/(\d+)\s*(?:min|minute)/i)
+            return total + (match ? parseInt(match[1]) : 0)
+          }, 0) || 30,
+          difficulty: IntensityLevel.MODERATE,
+          equipment: Equipment.BASIC,
+          status: workout.focusSportTypeForTheDay === 'REST' ? WorkoutStatus.REST : (statusMap[workout.completionStatus] || WorkoutStatus.PLANNED),
+          content: workout.markdownContent || '',
+          date: workout.dayDate
+        }
+      })
+
+      setWorkoutSessions(workoutMap)
+    } catch (error) {
+      console.error('Error loading workouts:', error)
+      setWorkoutError('Failed to load workouts')
+    } finally {
+      setIsLoadingWorkouts(false)
+    }
+  }, [user?.id, currentMonth])
+
+  // Function to refresh workouts after generation
+  const refreshWorkouts = useCallback(async () => {
+    await loadWorkouts()
+  }, [loadWorkouts])
+
+  // Function to add a new workout to the sessions
+  const addWorkoutToSessions = useCallback((workout: any) => {
+    const sportTypeMap: Record<string, WorkoutType> = {
+      'STRENGTH': WorkoutType.STRENGTH,
+      'HIIT': WorkoutType.HIIT,
+      'YOGA_MOBILITY': WorkoutType.YOGA,
+      'RUNNING_INTERVALS': WorkoutType.RUNNING,
+      'REST': WorkoutType.REST
+    }
+
+    const newWorkoutSession: WorkoutSession = {
+      id: workout.id,
+      name: `${workout.focusSportTypeForTheDay.replace('_', ' ')} Training`,
+      type: sportTypeMap[workout.focusSportTypeForTheDay] || WorkoutType.STRENGTH,
+      duration: workout.scheduledExercises?.reduce((total: number, exercise: any) => {
+        const match = exercise.prescribedSetsRepsDuration.match(/(\d+)\s*(?:min|minute)/i)
+        return total + (match ? parseInt(match[1]) : 0)
+      }, 0) || 30,
       difficulty: IntensityLevel.MODERATE,
       equipment: Equipment.BASIC,
-      status: WorkoutStatus.COMPLETED,
-      date: "2025-01-08",
-      content: `# Full Body Strength 💪
-
-## Warm-up (5 minutes)
-- **Arm circles**: 1 minute each direction
-- **Leg swings**: 1 minute each leg
-- **Light jogging in place**: 2 minutes
-
-## Main Workout (35 minutes)
-
-### Upper Body Circuit (15 minutes)
-| Exercise | Sets | Reps | Rest |
-|----------|------|------|------|
-| **Push-ups** | 3 | 12-15 | 60s |
-| **Dumbbell Rows** | 3 | 10-12 | 60s |
-| **Shoulder Press** | 3 | 8-10 | 90s |
-
-### Lower Body Circuit (15 minutes)
-| Exercise | Sets | Reps | Rest |
-|----------|------|------|------|
-| **Squats** | 3 | 15-20 | 60s |
-| **Lunges** | 3 | 12 each leg | 60s |
-| **Calf Raises** | 3 | 20 | 45s |
-
-### Core Finisher (5 minutes)
-- **Plank**: 3 × 30 seconds
-- **Russian Twists**: 3 × 20
-- **Dead Bug**: 3 × 10 each side
-
-## Cool Down (5 minutes)
-- Full body stretching routine
-
----
-**Calories Burned**: ~320 kcal  
-**Difficulty**: ⭐⭐⭐⚪⚪  
-**Status**: ✅ **COMPLETED**`,
-    },
-    "2025-01-10": {
-      id: "2",
-      name: "HIIT Cardio Blast",
-      type: WorkoutType.HIIT,
-      duration: 30,
-      difficulty: IntensityLevel.HIGH,
-      equipment: Equipment.NONE,
-      status: WorkoutStatus.COMPLETED,
-      date: "2025-01-10",
-      content: `# HIIT Cardio Blast 🔥
-
-## Overview
-High-intensity interval training to boost cardiovascular fitness and burn calories.
-
-## Warm-up (5 minutes)
-- **Marching in place**: 2 minutes
-- **Arm swings**: 1 minute
-- **Light stretching**: 2 minutes
-
-## HIIT Rounds (20 minutes)
-**4 rounds × 4 exercises × 45s work / 15s rest**
-
-### Round Structure
-| Exercise | Work | Rest | Notes |
-|----------|------|------|-------|
-| **Burpees** | 45s | 15s | Full body explosive |
-| **Mountain Climbers** | 45s | 15s | Keep core tight |
-| **Jump Squats** | 45s | 15s | Land softly |
-| **High Knees** | 45s | 15s | Drive knees up |
-
-**2 minutes rest between rounds**
-
-## Cool Down (5 minutes)
-- Walking in place: 2 minutes
-- Static stretches: 3 minutes
-
----
-**Peak Heart Rate**: 85-95% max HR  
-**Calories Burned**: ~280 kcal  
-**Status**: ✅ **COMPLETED**`,
-    },
-    "2025-01-12": {
-      id: "3",
-      name: "Upper Body Power",
-      type: WorkoutType.STRENGTH,
-      duration: 40,
-      difficulty: IntensityLevel.MODERATE,
-      equipment: Equipment.BASIC,
-      status: WorkoutStatus.COMPLETED,
-      date: "2025-01-12",
-      content: `# Upper Body Power 💥
-
-## Focus
-Chest, shoulders, and triceps with compound and isolation movements.
-
-## Warm-up (5 minutes)
-- **Arm circles**: 2 minutes
-- **Push-up to downward dog**: 2 minutes
-- **Shoulder rolls**: 1 minute
-
-## Main Workout (30 minutes)
-
-### Primary Movements
-| Exercise | Sets | Reps | Weight |
-|----------|------|------|--------|
-| **Push-ups** | 4 | 12-15 | Bodyweight |
-| **Pike Push-ups** | 3 | 8-10 | Bodyweight |
-| **Dumbbell Press** | 4 | 10-12 | 25 lbs each |
-
-### Secondary Work
-- **Lateral Raises**: 3 × 15 (15 lbs)
-- **Tricep Dips**: 3 × 12-15
-- **Overhead Press**: 3 × 10 (20 lbs each)
-- **Diamond Push-ups**: 2 × 8-10
-
-## Cool Down (5 minutes)
-- Chest doorway stretch
-- Shoulder cross-body stretch
-- Tricep overhead stretch
-
----
-**Focus**: Upper body strength and endurance  
-**Status**: ✅ **COMPLETED**`,
-    },
-
-    // Rest days (Yellow)
-    "2025-01-09": {
-      id: "4",
-      name: "Active Recovery",
-      type: WorkoutType.YOGA,
-      duration: 20,
-      difficulty: IntensityLevel.LOW,
-      equipment: Equipment.BASIC,
-      status: WorkoutStatus.REST,
-      date: "2025-01-09",
-      content: `# Active Recovery Day 🧘‍♀️
-
-## Purpose
-Gentle movement to promote recovery and maintain mobility.
-
-## Light Movement (20 minutes)
-
-### Gentle Flow (15 minutes)
-- **Child's Pose**: 2 minutes
-- **Cat-Cow stretches**: 3 minutes
-- **Gentle spinal twists**: 3 minutes
-- **Hip circles**: 2 minutes
-- **Shoulder rolls**: 2 minutes
-- **Deep breathing**: 3 minutes
-
-### Optional Activities
-- **Easy walk**: 10-15 minutes
-- **Light stretching**: As needed
-- **Foam rolling**: 5-10 minutes
-
-## Recovery Focus
-- **Hydration**: 2.5+ liters of water
-- **Sleep**: Aim for 8+ hours
-- **Nutrition**: Anti-inflammatory foods
-
----
-**Activity Level**: Very light  
-**Benefits**: Recovery and flexibility  
-**Status**: 😴 **REST DAY**`,
-    },
-    "2025-01-11": {
-      id: "5",
-      name: "Rest & Mobility",
-      type: WorkoutType.YOGA,
-      duration: 15,
-      difficulty: IntensityLevel.LOW,
-      equipment: Equipment.NONE,
-      status: WorkoutStatus.REST,
-      date: "2025-01-11",
-      content: `# Rest & Mobility Day 🌱
-
-## Recovery Focus
-Today is about gentle movement and mental relaxation.
-
-## Mobility Routine (15 minutes)
-
-### Upper Body (5 minutes)
-- **Neck stretches**: 1 minute each direction
-- **Shoulder shrugs**: 1 minute
-- **Arm circles**: 2 minutes
-
-### Lower Body (5 minutes)
-- **Hip circles**: 2 minutes
-- **Leg swings**: 2 minutes
-- **Ankle rolls**: 1 minute
-
-### Core & Spine (5 minutes)
-- **Gentle spinal twists**: 3 minutes
-- **Cat-cow stretches**: 2 minutes
-
-## Wellness Activities
-- **Meditation**: 10-15 minutes
-- **Reading**: Relaxation time
-- **Nature walk**: If weather permits
-
----
-**Intensity**: Minimal  
-**Focus**: Recovery and mental health  
-**Status**: 😴 **REST DAY**`,
-    },
-    "2025-01-13": {
-      id: "6",
-      name: "Complete Rest",
-      type: WorkoutType.YOGA,
-      duration: 0,
-      difficulty: IntensityLevel.LOW,
-      equipment: Equipment.NONE,
-      status: WorkoutStatus.REST,
-      date: "2025-01-13",
-      content: `# Complete Rest Day 😴
-
-## Why Complete Rest?
-After intense training, your body needs time to repair and grow stronger.
-
-## Rest Day Benefits
-- **Muscle repair** and growth
-- **Nervous system** recovery
-- **Mental** recharge
-- **Injury prevention**
-- **Hormone balance**
-
-## Optional Light Activities
-Choose only if you feel energetic:
-
-### Gentle Options (10-15 minutes max)
-- **Easy walk** in fresh air
-- **Light stretching** routine
-- **Deep breathing** exercises
-- **Meditation** or mindfulness
-
-## Recovery Checklist
-- ✅ **Sleep**: 8+ hours of quality sleep
-- ✅ **Hydration**: 3+ liters of water
-- ✅ **Nutrition**: Protein-rich, anti-inflammatory foods
-- ✅ **Stress management**: Relaxation techniques
-
-## Tomorrow's Preview
-Get ready for an exciting **CrossFit workout** tomorrow!
-
----
-**Activity Level**: None to minimal  
-**Focus**: Complete recovery  
-**Status**: 😴 **COMPLETE REST**
-
-> 💚 **Remember: Rest days are when the magic happens - your body gets stronger!**`,
-    },
-
-    // Upcoming planned workouts (Blue)
-    "2025-01-15": {
-      id: "7",
-      name: "CrossFit WOD: Cindy",
-      type: WorkoutType.CROSSFIT,
-      duration: 25,
-      difficulty: IntensityLevel.HIGH,
-      equipment: Equipment.BASIC,
       status: WorkoutStatus.PLANNED,
-      date: "2025-01-15",
-      content: `# CrossFit WOD: "Cindy" 🏋️‍♀️
+      content: workout.markdownContent || '',
+      date: workout.dayDate
+    }
 
-## The Workout
-**AMRAP 20** (As Many Rounds As Possible in 20 minutes)
-- **5 Pull-ups** (or assisted)
-- **10 Push-ups**
-- **15 Air Squats**
+    setWorkoutSessions(prev => ({
+      ...prev,
+      [workout.dayDate]: newWorkoutSession
+    }))
+  }, [])
 
-## Warm-up (5 minutes)
-- **Row or jump rope**: 3 minutes
-- **Dynamic stretching**: 2 minutes
-- **Movement practice**: Light versions of workout movements
+  // Load workouts when component mounts or month changes
+  useEffect(() => {
+    loadWorkouts()
+  }, [loadWorkouts, currentMonth])
 
-## Strategy Tips
-1. **Pace yourself** - aim for consistent rounds
-2. **Break up reps** if needed (e.g., 3+2 pull-ups)
-3. **Breathe** during transitions
-4. **Track your rounds** + additional reps
-
-## Scaling Options
-
-### Beginner
-- **Pull-ups**: Assisted or ring rows
-- **Push-ups**: Knee push-ups or incline
-- **Air Squats**: Chair-assisted if needed
-
-### Intermediate (RX)
-- All movements as prescribed
-- Focus on consistent pace
-
-### Advanced
-- **Pull-ups**: Chest-to-bar
-- **Push-ups**: Handstand push-ups
-- **Air Squats**: Jump squats
-
-## Target Scores
-- **Beginner**: 8-12 rounds
-- **Intermediate**: 12-16 rounds
-- **Advanced**: 16-20+ rounds
-
----
-**Intensity**: Very High  
-**Focus**: Muscular endurance  
-**Status**: 📅 **SCHEDULED**
-
-> 🔥 **"Cindy" is a classic benchmark WOD - give it everything you've got!**`,
-    },
-    "2025-01-17": {
-      id: "8",
-      name: "5K Run Training",
-      type: WorkoutType.RUNNING,
-      duration: 35,
-      difficulty: IntensityLevel.MODERATE,
-      equipment: Equipment.NONE,
-      status: WorkoutStatus.PLANNED,
-      date: "2025-01-17",
-      content: `# 5K Run Training 🏃‍♀️
-
-## Training Goal
-Build endurance and improve 5K pace with structured intervals.
-
-## Pre-Run (5 minutes)
-- **Light walking**: 2 minutes
-- **Dynamic warm-up**: 3 minutes
-  - Leg swings, high knees, butt kicks
-  - Ankle circles, calf raises
-
-## Main Run (25 minutes)
-
-### Interval Structure
-| Phase | Duration | Intensity | Pace |
-|-------|----------|-----------|------|
-| **Warm-up Run** | 5 min | Easy | Conversational |
-| **Interval 1** | 3 min | Hard | 5K pace |
-| **Recovery** | 2 min | Easy | Slow jog |
-| **Interval 2** | 3 min | Hard | 5K pace |
-| **Recovery** | 2 min | Easy | Slow jog |
-| **Interval 3** | 3 min | Hard | 5K pace |
-| **Cool-down** | 7 min | Easy | Conversational |
-
-## Running Form Focus
-- **Posture**: Tall spine, slight forward lean
-- **Cadence**: ~180 steps per minute
-- **Foot strike**: Midfoot landing
-- **Arms**: Relaxed, 90-degree angle
-
-## Post-Run (5 minutes)
-- **Cool-down walk**: 2 minutes
-- **Stretching**: 3 minutes
-  - Calf, quad, hamstring, hip flexor
-
----
-**Target Heart Rate**: 70-85% max HR  
-**Calories**: ~300-350 kcal  
-**Status**: 📅 **SCHEDULED**`,
-    },
-    "2025-01-19": {
-      id: "9",
-      name: "Lower Body Strength",
-      type: WorkoutType.STRENGTH,
-      duration: 45,
-      difficulty: IntensityLevel.HIGH,
-      equipment: Equipment.BASIC,
-      status: WorkoutStatus.PLANNED,
-      date: "2025-01-19",
-      content: `# Lower Body Strength 🦵
-
-## Focus
-Comprehensive leg and glute workout for strength and power.
-
-## Warm-up (8 minutes)
-- **Dynamic leg swings**: 2 minutes
-- **Bodyweight squats**: 2 minutes
-- **Walking lunges**: 2 minutes
-- **Calf raises**: 2 minutes
-
-## Main Workout (32 minutes)
-
-### Compound Movements (20 minutes)
-| Exercise | Sets | Reps | Rest |
-|----------|------|------|------|
-| **Goblet Squats** | 4 | 12-15 | 90s |
-| **Romanian Deadlifts** | 4 | 10-12 | 90s |
-| **Bulgarian Split Squats** | 3 | 10 each leg | 60s |
-
-### Isolation Work (12 minutes)
-- **Single-leg Glute Bridges**: 3 × 12 each leg
-- **Wall Sit**: 3 × 45 seconds
-- **Calf Raises**: 3 × 20
-- **Lateral Lunges**: 3 × 10 each side
-
-## Finisher Circuit (3 minutes)
-- **Jump Squats**: 30 seconds
-- **Rest**: 30 seconds
-- **Repeat 3 times**
-
-## Cool Down (5 minutes)
-- Quad stretch, hamstring stretch
-- Hip flexor stretch, calf stretch
-- Glute stretch
-
----
-**Focus**: Lower body strength and power  
-**Difficulty**: ⭐⭐⭐⭐⚪  
-**Status**: 📅 **SCHEDULED**`,
-    },
-    "2025-01-21": {
-      id: "10",
-      name: "HIIT Tabata Circuit",
-      type: WorkoutType.HIIT,
-      duration: 20,
-      difficulty: IntensityLevel.EXTREME,
-      equipment: Equipment.NONE,
-      status: WorkoutStatus.PLANNED,
-      date: "2025-01-21",
-      content: `# HIIT Tabata Circuit ⚡
-
-## Protocol
-**Tabata Format**: 20 seconds all-out work / 10 seconds rest
-**4 exercises × 8 rounds each = 16 minutes total**
-
-## Circuit Breakdown
-
-### Round 1: Burpees (4 minutes)
-- **Work**: 20 seconds maximum burpees
-- **Rest**: 10 seconds active recovery
-- **Repeat**: 8 times
-
-### Round 2: Mountain Climbers (4 minutes)
-- **Work**: 20 seconds fast mountain climbers
-- **Rest**: 10 seconds hold plank
-- **Repeat**: 8 times
-
-### Round 3: Jump Squats (4 minutes)
-- **Work**: 20 seconds explosive jump squats
-- **Rest**: 10 seconds bodyweight squats
-- **Repeat**: 8 times
-
-### Round 4: High Knees (4 minutes)
-- **Work**: 20 seconds maximum high knees
-- **Rest**: 10 seconds marching in place
-- **Repeat**: 8 times
-
-## Intensity Guidelines
-- **Work Phase**: 95-100% maximum effort
-- **Rest Phase**: Keep moving, don't stop completely
-- **Between Rounds**: 1 minute active recovery
-
-## Expected Results
-- **Heart Rate**: 85-95% max during work phases
-- **Calories**: ~200-250 kcal
-- **EPOC**: Elevated metabolism for 12+ hours post-workout
-
----
-**Total Time**: 20 minutes  
-**Difficulty**: ⭐⭐⭐⭐⭐  
-**Status**: 📅 **SCHEDULED**
-
-> 🔥 **Tabata is scientifically proven to improve both aerobic and anaerobic capacity in just 4 minutes per exercise!**`,
-    },
-  }
+  // Clear workouts when user logs out
+  useEffect(() => {
+    if (!user?.id) {
+      setWorkoutSessions({})
+    }
+  }, [user?.id])
 
   useEffect(() => {
     // Load workout for selected date with proper error handling
-    const dateKey = selectedDate.toISOString().split("T")[0]
+    const dateKey = formatDateForAPI(selectedDate)
     const workout = workoutSessions[dateKey] || null
     setCurrentWorkout(workout)
 
     // Debug log to verify data loading
     console.log(`Selected date: ${dateKey}, Workout found:`, workout ? workout.name : "None")
-  }, [selectedDate])
+  }, [selectedDate, workoutSessions])
 
   const getDateStatus = (date: Date): WorkoutStatus => {
-    const dateKey = date.toISOString().split("T")[0]
+    const dateKey = formatDateForAPI(date)
     const workout = workoutSessions[dateKey]
     return workout?.status || WorkoutStatus.NONE
   }
@@ -731,6 +388,405 @@ Comprehensive leg and glute workout for strength and power.
     setSelectedDate(date)
   }
 
+  // Helper to map WorkoutType to backend SportType
+  const mapWorkoutTypeToSportType = (workoutType?: WorkoutType): string => {
+    switch (workoutType) {
+      case WorkoutType.STRENGTH:
+        return 'STRENGTH'
+      case WorkoutType.HIIT:
+        return 'HIIT'
+      case WorkoutType.YOGA:
+        return 'YOGA_MOBILITY'
+      case WorkoutType.RUNNING:
+        return 'RUNNING_INTERVALS'
+      case WorkoutType.CARDIO:
+        return 'RUNNING_INTERVALS'
+      default:
+        return 'STRENGTH'
+    }
+  }
+
+  // Workout generation handlers
+  const handleGenerateDailyWorkout = async () => {
+    if (!user?.id) {
+      setGenerationStatus({
+        type: 'error',
+        message: 'Please login to generate workouts'
+      })
+      return
+    }
+
+    setIsGenerating(true)
+    setGenerationStatus(null)
+
+    try {
+      // Map frontend LLM preference to backend AI preference
+      const aiPreference = llmPreference === 'cloud' ? 'cloud' : 'local'
+      
+      const requestBody = {
+        userId: user.id,
+        dayDate: getTodayLocalDate(),
+        focusSportType: mapWorkoutTypeToSportType(userPreferences.preferredWorkouts[0]),
+        targetDurationMinutes: userPreferences.workoutDuration,
+        aiPreference: aiPreference,
+        ...(customPrompt.trim() && { textPrompt: customPrompt.trim() })
+      }
+
+      console.log('Daily workout request:', requestBody)
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/workout-plan-service/api/v1/plans/generate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('flexfit_token')}`
+        },
+        body: JSON.stringify(requestBody)
+      })
+
+      if (response.ok) {
+        const workout = await response.json()
+        setGenerationStatus({
+          type: 'success',
+          message: 'Daily workout generated successfully!'
+        })
+        // Refresh workouts to show the new one
+        await loadWorkouts()
+      } else {
+        const errorText = await response.text()
+        console.error('Daily workout error response:', response.status, errorText)
+        throw new Error(`Failed to generate workout: ${response.status} - ${errorText}`)
+      }
+    } catch (error) {
+      console.error('Daily workout error:', error)
+      setGenerationStatus({
+        type: 'error',
+        message: `Failed to generate workout: ${error instanceof Error ? error.message : 'Unknown error'}`
+      })
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
+  const handleGenerateWeeklyWorkout = async () => {
+    if (!user?.id) {
+      setGenerationStatus({
+        type: 'error',
+        message: 'Please login to generate workouts'
+      })
+      return
+    }
+
+    setIsGenerating(true)
+    setGenerationStatus(null)
+
+    try {
+      // Map frontend LLM preference to backend AI preference
+      const aiPreference = llmPreference === 'cloud' ? 'cloud' : 'local'
+      
+      const requestBody = {
+        userId: user.id,
+        dayDate: getTodayLocalDate(),
+        focusSportType: mapWorkoutTypeToSportType(userPreferences.preferredWorkouts[0]),
+        targetDurationMinutes: userPreferences.workoutDuration,
+        aiPreference: aiPreference,
+        ...(customPrompt.trim() && { textPrompt: customPrompt.trim() })
+      }
+
+      console.log('Weekly workout request:', requestBody)
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/workout-plan-service/api/v1/plans/generate-weekly-plan`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('flexfit_token')}`
+        },
+        body: JSON.stringify(requestBody)
+      })
+
+      if (response.ok) {
+        const weeklyWorkouts = await response.json()
+        setGenerationStatus({
+          type: 'success',
+          message: `Weekly plan generated successfully! Created ${Array.isArray(weeklyWorkouts) ? weeklyWorkouts.length : '7'} workouts.`
+        })
+        // Refresh workouts to show the new ones
+        await loadWorkouts()
+      } else {
+        const errorText = await response.text()
+        console.error('Weekly workout error response:', response.status, errorText)
+        throw new Error(`Failed to generate weekly plan: ${response.status} - ${errorText}`)
+      }
+    } catch (error) {
+      console.error('Weekly workout error:', error)
+      setGenerationStatus({
+        type: 'error',
+        message: `Failed to generate weekly plan: ${error instanceof Error ? error.message : 'Unknown error'}`
+      })
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
+  const handleGenerateQueueWeeklyWorkout = async () => {
+    if (!user?.id) {
+      setGenerationStatus({
+        type: 'error',
+        message: 'Please login to generate workouts'
+      })
+      return
+    }
+
+    setIsGenerating(true)
+    setGenerationStatus(null)
+
+    // Add initial message to chat
+    const initialMessage: ChatMessage = {
+      id: Date.now().toString(),
+      role: "assistant",
+      content: "🚀 Starting Smart Queue Weekly Plan generation! Fetching your recent workout history for better planning...",
+      timestamp: new Date()
+    }
+    setChatMessages(prev => [...prev, initialMessage])
+
+    try {
+      // Step 1: Fetch last week's workouts for context
+      let lastWeeksWorkouts: any[] = []
+      try {
+        const historyResponse = await workoutService.getLastWeeksWorkouts(user.id)
+        if (historyResponse.data) {
+          lastWeeksWorkouts = historyResponse.data || []
+          
+          const historyMessage: ChatMessage = {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content: `📊 Found ${lastWeeksWorkouts.length} workouts from your recent history. This will help create a balanced weekly plan with proper rest days!`,
+            timestamp: new Date()
+          }
+          setChatMessages(prev => [...prev, historyMessage])
+        }
+      } catch (error) {
+        console.warn('Could not fetch workout history:', error)
+        const warningMessage: ChatMessage = {
+          id: (Date.now() + 2).toString(),
+          role: "assistant",
+          content: "⚠️ Couldn't fetch workout history, but continuing with generation...",
+          timestamp: new Date()
+        }
+        setChatMessages(prev => [...prev, warningMessage])
+      }
+
+      // Step 2: Create a smart weekly workout plan starting from TODAY
+      const today = new Date()
+      const startOfWeek = new Date(today)
+      // Start from today for the next 7 days
+      startOfWeek.setDate(today.getDate())
+
+      let successCount = 0
+      let errorCount = 0
+      
+      // Generate day names starting from today
+      const dayNames = []
+      for (let i = 0; i < 7; i++) {
+        const date = new Date(startOfWeek)
+        date.setDate(startOfWeek.getDate() + i)
+        dayNames.push(date.toLocaleDateString('en-US', { weekday: 'long' }))
+      }
+      
+      // Create smart workout schedule based on user preferences
+      const createSmartWeeklyPlan = () => {
+        const workoutsPerWeek = userPreferences.workoutsPerWeek
+        const restDays = 7 - workoutsPerWeek
+        
+        // Base workout types from user preferences
+        const preferredWorkoutTypes = userPreferences.preferredWorkouts.slice(0, 3) // Get up to 3 preferred types
+        
+        const plan = []
+        let workoutCount = 0
+        
+        for (let i = 0; i < 7; i++) {
+          const dayName = dayNames[i]
+          
+          if (workoutCount < workoutsPerWeek) {
+            // Assign workout days
+            const workoutType = preferredWorkoutTypes[workoutCount % preferredWorkoutTypes.length] || WorkoutType.STRENGTH
+            const sportType = workoutType === WorkoutType.STRENGTH ? 'STRENGTH' : 
+                             workoutType === WorkoutType.HIIT ? 'HIIT' :
+                             workoutType === WorkoutType.YOGA ? 'YOGA_MOBILITY' :
+                             workoutType === WorkoutType.RUNNING ? 'RUNNING_INTERVALS' :
+                             workoutType === WorkoutType.CARDIO ? 'RUNNING_INTERVALS' :
+                             'STRENGTH'
+            plan.push({ 
+              day: dayName, 
+              sportType, 
+              isRest: false 
+            })
+            workoutCount++
+          } else {
+            // Assign rest days
+            plan.push({ day: dayName, sportType: 'REST', isRest: true })
+          }
+        }
+        
+        return plan
+      }
+      
+      const weeklyPlan = createSmartWeeklyPlan()
+
+      // Generate workouts one by one sequentially
+      for (let i = 0; i < 7; i++) {
+        const currentDate = new Date(startOfWeek)
+        currentDate.setDate(startOfWeek.getDate() + i)
+        const dayName = dayNames[i]
+        const dayPlan = weeklyPlan[i]
+        
+        // Add progress message to chat
+        const progressMessage: ChatMessage = {
+          id: (Date.now() + i + 100).toString(),
+          role: "assistant",
+          content: `⏳ Generating ${dayPlan.isRest ? 'rest day plan' : dayPlan.sportType + ' workout'} for ${dayName} (${formatDateForAPI(currentDate)})...`,
+          timestamp: new Date()
+        }
+        setChatMessages(prev => [...prev, progressMessage])
+
+        // Build enhanced prompt with workout history context
+        let enhancedPrompt = customPrompt.trim()
+        if (lastWeeksWorkouts.length > 0) {
+          const recentExercises = lastWeeksWorkouts.flatMap(w => 
+            w.scheduledExercises?.map((e: any) => e.exerciseName) || []
+          ).join(', ')
+          
+          enhancedPrompt += enhancedPrompt ? ' | ' : ''
+          enhancedPrompt += `Consider recent workouts from last 7 days for variety and recovery. Recent exercises: ${recentExercises}`
+        }
+
+        if (dayPlan.isRest) {
+          enhancedPrompt += (enhancedPrompt ? ' | ' : '') + 'This is a REST day - create light recovery activities, stretching, or complete rest'
+        }
+
+        // Map frontend LLM preference to backend AI preference
+        const aiPreference = llmPreference === 'cloud' ? 'cloud' : 'local'
+        
+        const requestBody = {
+          userId: user.id,
+          dayDate: formatDateForAPI(currentDate),
+          focusSportType: dayPlan.isRest ? WorkoutServiceSportType.REST : 
+            (dayPlan.sportType === 'STRENGTH' ? WorkoutServiceSportType.STRENGTH :
+             dayPlan.sportType === 'HIIT' ? WorkoutServiceSportType.HIIT :
+             dayPlan.sportType === 'YOGA_MOBILITY' ? WorkoutServiceSportType.YOGA_MOBILITY :
+             dayPlan.sportType === 'RUNNING_INTERVALS' ? WorkoutServiceSportType.RUNNING_INTERVALS :
+             WorkoutServiceSportType.STRENGTH),
+          targetDurationMinutes: dayPlan.isRest ? 15 : userPreferences.workoutDuration,
+          aiPreference: aiPreference,
+          ...(enhancedPrompt && { textPrompt: enhancedPrompt })
+        }
+
+        console.log(`Generating workout for ${dayName}:`, requestBody)
+
+        try {
+          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/workout-plan-service/api/v1/plans/generate`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem('flexfit_token')}`
+            },
+            body: JSON.stringify(requestBody)
+          })
+
+          if (response.ok) {
+            const workout = await response.json()
+            successCount++
+            
+            // Add success message to chat
+            const successMessage: ChatMessage = {
+              id: (Date.now() + i + 1000).toString(),
+              role: "assistant",
+              content: `✅ ${dayName} ${dayPlan.isRest ? 'rest day' : 'workout'} generated! ${dayPlan.isRest ? 'Light recovery activities planned.' : `Created ${dayPlan.sportType} workout with ${workout.scheduledExercises?.length || 'several'} exercises.`}`,
+              timestamp: new Date()
+            }
+            setChatMessages(prev => [...prev, successMessage])
+            
+            // Refresh calendar to show the newly created workout immediately  
+            await loadWorkouts()
+            
+            // Small delay for better visual feedback
+            await new Promise(resolve => setTimeout(resolve, 500))
+
+          } else {
+            errorCount++
+            const errorText = await response.text()
+            console.error(`${dayName} error:`, response.status, errorText)
+            
+            // Add error message to chat
+            const errorMessage: ChatMessage = {
+              id: (Date.now() + i + 2000).toString(),
+              role: "assistant", 
+              content: `❌ Failed to generate ${dayName} ${dayPlan.isRest ? 'rest day' : 'workout'}: ${response.status} - ${errorText}`,
+              timestamp: new Date()
+            }
+            setChatMessages(prev => [...prev, errorMessage])
+          }
+
+        } catch (error) {
+          errorCount++
+          console.error(`${dayName} failed:`, error)
+          
+          // Add error message to chat
+          const errorMessage: ChatMessage = {
+            id: (Date.now() + i + 3000).toString(),
+            role: "assistant",
+            content: `❌ ${dayName} ${dayPlan.isRest ? 'rest day' : 'workout'} failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            timestamp: new Date()
+          }
+          setChatMessages(prev => [...prev, errorMessage])
+        }
+
+        // Small delay between requests to avoid overwhelming the server
+        if (i < 6) {
+          await new Promise(resolve => setTimeout(resolve, 500))
+        }
+      }
+
+      // Final summary message
+      const summaryMessage: ChatMessage = {
+        id: (Date.now() + 10000).toString(),
+        role: "assistant",
+        content: `🎉 Smart Queue Weekly Plan completed! Successfully generated ${successCount}/7 days (including rest days).${errorCount > 0 ? ` ${errorCount} failed.` : ' All days planned successfully!'} Your plan includes proper rest and recovery based on your workout history.`,
+        timestamp: new Date()
+      }
+      setChatMessages(prev => [...prev, summaryMessage])
+
+      if (successCount > 0) {
+        setGenerationStatus({
+          type: 'success',
+          message: `Smart weekly plan completed! Successfully generated ${successCount}/7 days.${errorCount > 0 ? ` ${errorCount} failed.` : ''}`
+        })
+        // Refresh workouts to show the new ones
+        await loadWorkouts()
+      } else {
+        throw new Error('All workout generations failed')
+      }
+
+    } catch (error) {
+      console.error('Queue weekly workout error:', error)
+      
+      // Add final error message to chat
+      const errorMessage: ChatMessage = {
+        id: (Date.now() + 20000).toString(),
+        role: "assistant",
+        content: `💥 Smart Queue Weekly Plan failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        timestamp: new Date()
+      }
+      setChatMessages(prev => [...prev, errorMessage])
+
+      setGenerationStatus({
+        type: 'error',
+        message: `Failed to generate smart weekly plan: ${error instanceof Error ? error.message : 'Unknown error'}`
+      })
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
   const navigateMonth = (direction: "prev" | "next") => {
     const newMonth = new Date(currentMonth)
     if (direction === "prev") {
@@ -760,7 +816,7 @@ Comprehensive leg and glute workout for strength and power.
     return days
   }
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!chatInput.trim()) return
 
     const userMessage: ChatMessage = {
@@ -772,70 +828,709 @@ Comprehensive leg and glute workout for strength and power.
 
     setChatMessages((prev) => [...prev, userMessage])
 
-    // Simulate AI response
-    setTimeout(() => {
+    // Show "typing" indicator
+    const typingMessage: ChatMessage = {
+      id: "typing",
+      role: "assistant",
+      content: "🤖 Generating your workout plan...",
+      timestamp: new Date(),
+    }
+    setChatMessages((prev) => [...prev, typingMessage])
+
+    try {
+      const input = chatInput.toLowerCase()
+      let responseContent = ""
+
+      // Check for workout generation requests first
+      if (input.includes("create") && (input.includes("workout") || input.includes("training") || input.includes("plan")) || 
+          input.includes("generate") && input.includes("workout") ||
+          input.includes("crossfit") || input.includes("week") && input.includes("training")) {
+        
+        const workoutRequest = parseWorkoutRequest(input)
+        responseContent = await generateWorkoutPlan(workoutRequest)
+        
+      } else if (input.includes("workout") || input.includes("exercise")) {
+        responseContent = `Here are some workout suggestions based on your ${userPreferences.fitnessGoal} goal and ${userPreferences.experienceLevel} level:\n\n• ${getWorkoutSuggestion()}\n• Try saying "create me a 1 week crossfit training" for AI-generated plans\n• I can help you adjust intensity or duration if needed!`
+      } else if (input.includes("diet") || input.includes("nutrition") || input.includes("food")) {
+        responseContent = `For your ${userPreferences.fitnessGoal} goal, here are some nutrition tips:\n\n• Focus on balanced meals with protein, carbs, and healthy fats\n• Stay hydrated throughout the day\n• Eat plenty of fruits and vegetables\n\nWould you like specific meal suggestions?`
+      } else if (input.includes("help") || input.includes("?")) {
+        responseContent = `I'm here to help with your fitness journey! I can assist with:\n\n• 💪 **AI Workout Generation** - Say "create me a 1 week crossfit training"\n• 📅 Scheduling your fitness routine\n• 🥗 Basic nutrition guidance\n• ⚙️ Adjusting your preferences\n\n**Try these commands:**\n• "Create me a 3 day strength training"\n• "Generate a week of HIIT workouts"\n• "I need a yoga session"`
+      } else if (input.includes("schedule") || input.includes("time") || input.includes("when")) {
+        responseContent = `Based on your preferences, I recommend:\n\n• Aim for ${userPreferences.workoutsPerWeek} workouts per week\n• Each session around ${userPreferences.workoutDuration} minutes\n• Use the calendar above to track your progress\n\nWould you like me to generate a specific workout schedule?`
+      } else {
+        responseContent = `I understand you're asking about "${chatInput}". As your AI fitness assistant, I can:\n\n🤖 **Generate Real Workouts** - Try: "create me a 1 week crossfit training"\n📋 **Plan Your Schedule** - I'll create personalized workout plans\n💾 **Save Everything** - All workouts are saved to your calendar\n\nCurrent preferences: ${userPreferences.fitnessGoal}, ${userPreferences.experienceLevel} level\n\nWhat workout would you like me to create?`
+      }
+
+      // Remove typing indicator and add real response
+      setChatMessages((prev) => prev.filter(msg => msg.id !== "typing"))
+      
       const aiResponse: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: `I understand you want to ${chatInput}. Based on your current preferences (${userPreferences.fitnessGoal}, ${userPreferences.experienceLevel} level), I can help you adjust your workout plan. Would you like me to modify today's workout or update your preferences?`,
+        content: responseContent,
         timestamp: new Date(),
       }
       setChatMessages((prev) => [...prev, aiResponse])
-    }, 1000)
+      
+    } catch (error) {
+      console.error("Chat error:", error)
+      
+      // Remove typing indicator and show error
+      setChatMessages((prev) => prev.filter(msg => msg.id !== "typing"))
+      
+      const errorResponse: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: "❌ Sorry, I encountered an error. Please try again or make sure you're logged in.",
+        timestamp: new Date(),
+      }
+      setChatMessages((prev) => [...prev, errorResponse])
+    }
 
     setChatInput("")
   }
 
-  const AuthDialog = ({ type }: { type: "login" | "register" }) => (
-    <DialogContent className="sm:max-w-md">
-      <DialogHeader>
-        <DialogTitle className="text-center">{type === "login" ? "Welcome Back" : "Join FlexFit"}</DialogTitle>
-      </DialogHeader>
-      <div className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
-          <Input id="email" type="email" placeholder="your@email.com" />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="password">Password</Label>
-          <Input id="password" type="password" />
-        </div>
-        {type === "register" && (
-          <div className="space-y-2">
-            <Label htmlFor="name">Full Name</Label>
-            <Input id="name" placeholder="Your Name" />
+  const getWorkoutSuggestion = (): string => {
+    const workoutTypes = userPreferences.preferredWorkouts
+    const equipment = userPreferences.equipment
+    const intensity = userPreferences.intensityLevel
+    
+    if (workoutTypes.includes(WorkoutType.STRENGTH)) {
+      return `${intensity} strength training with ${equipment.toLowerCase()}`
+    } else if (workoutTypes.includes(WorkoutType.CARDIO)) {
+      return `${intensity} cardio session (${userPreferences.workoutDuration} minutes)`
+    } else if (workoutTypes.includes(WorkoutType.HIIT)) {
+      return `${intensity} HIIT workout for maximum efficiency`
+    } else {
+      return `${intensity} ${workoutTypes[0]?.toLowerCase()} session`
+    }
+  }
+
+  const parseWorkoutRequest = (input: string) => {
+    const lowerInput = input.toLowerCase()
+    
+    // Extract days with more sophisticated patterns
+    let days = 1
+    
+    // Check for specific day patterns
+    const dayPatterns = [
+      { pattern: /(\d+)\s*(?:day|days)/i, multiplier: 1 },
+      { pattern: /(\d+)\s*(?:week|weeks)/i, multiplier: 7 },
+      { pattern: /(?:a|one)\s*week/i, value: 7 },
+      { pattern: /(?:two|2)\s*week/i, value: 14 },
+      { pattern: /(?:three|3)\s*week/i, value: 21 },
+      { pattern: /(?:four|4)\s*week/i, value: 28 },
+      { pattern: /(?:half|0\.5)\s*week/i, value: 3 },
+      { pattern: /(?:full|complete)\s*week/i, value: 7 },
+      { pattern: /(?:quick|short)\s*(?:week|plan)/i, value: 3 },
+      { pattern: /(?:intensive|intense)\s*(?:week|plan)/i, value: 5 },
+      { pattern: /(?:month|monthly)/i, value: 30 }
+    ]
+
+    for (const { pattern, multiplier, value } of dayPatterns) {
+      const match = lowerInput.match(pattern)
+      if (match) {
+        if (value) {
+          days = value
+        } else if (multiplier && match[1]) {
+          days = parseInt(match[1]) * multiplier
+        }
+        break
+      }
+    }
+
+    // Ensure days is within reasonable bounds
+    days = Math.max(1, Math.min(30, days))
+
+    // Enhanced sport type mapping with more keywords
+    let sportType = WorkoutServiceSportType.STRENGTH // default
+    
+    const sportPatterns = [
+      {
+        type: WorkoutServiceSportType.HIIT,
+        keywords: ['hiit', 'crossfit', 'cross fit', 'tabata', 'circuit', 'intervals', 'intensive', 'intense', 'cardio blast', 'fat burn', 'metabolic']
+      },
+      {
+        type: WorkoutServiceSportType.STRENGTH,
+        keywords: ['strength', 'weight', 'muscle', 'lifting', 'resistance', 'bodybuilding', 'powerlifting', 'gains', 'bulk', 'pump', 'iron']
+      },
+      {
+        type: WorkoutServiceSportType.YOGA_MOBILITY,
+        keywords: ['yoga', 'mobility', 'stretch', 'flexibility', 'pilates', 'mindful', 'meditation', 'zen', 'flow', 'balance', 'relaxation']
+      },
+      {
+        type: WorkoutServiceSportType.RUNNING_INTERVALS,
+        keywords: ['running', 'cardio', 'endurance', 'marathon', 'sprint', 'jog', 'treadmill', 'outdoor', 'distance', 'pace']
+      }
+    ]
+
+    for (const { type, keywords } of sportPatterns) {
+      if (keywords.some(keyword => lowerInput.includes(keyword))) {
+        sportType = type
+        break
+      }
+    }
+
+    // Extract duration with more patterns
+    let duration = userPreferences.workoutDuration
+    const durationPatterns = [
+      /(\d+)\s*(?:min|minute|minutes)/i,
+      /(\d+)\s*(?:hour|hours|hr|hrs)/i,
+      /(?:quick|short)\s*(?:workout|session)/i,
+      /(?:long|extended)\s*(?:workout|session)/i,
+      /(?:full|complete)\s*(?:workout|session)/i
+    ]
+
+    for (const pattern of durationPatterns) {
+      const match = lowerInput.match(pattern)
+      if (match) {
+        if (match[1]) {
+          const value = parseInt(match[1])
+          // Convert hours to minutes if necessary
+          duration = pattern.source.includes('hour') ? value * 60 : value
+        } else if (pattern.source.includes('quick|short')) {
+          duration = 20
+        } else if (pattern.source.includes('long|extended')) {
+          duration = 60
+        } else if (pattern.source.includes('full|complete')) {
+          duration = 45
+        }
+        break
+      }
+    }
+
+    // Ensure duration is within reasonable bounds
+    duration = Math.max(15, Math.min(120, duration))
+
+    // Extract equipment preferences
+    let equipment = null
+    const equipmentPatterns = [
+      { pattern: /no\s*equipment|bodyweight|body\s*weight/i, value: 'NO_EQUIPMENT' },
+      { pattern: /dumbbells?|weights?/i, value: 'DUMBBELLS' },
+      { pattern: /kettlebells?/i, value: 'KETTLEBELL' },
+      { pattern: /bands?|resistance\s*bands?/i, value: 'RESISTANCE_BANDS' },
+      { pattern: /gym|full\s*gym/i, value: 'FULL_GYM' },
+      { pattern: /home\s*gym/i, value: 'HOME_GYM' }
+    ]
+
+    for (const { pattern, value } of equipmentPatterns) {
+      if (pattern.test(lowerInput)) {
+        equipment = value
+        break
+      }
+    }
+
+    // Extract fitness level
+    let fitnessLevel = null
+    const levelPatterns = [
+      { pattern: /beginner|newbie|new\s*to/i, value: 'BEGINNER' },
+      { pattern: /intermediate|moderate/i, value: 'INTERMEDIATE' },
+      { pattern: /advanced|experienced/i, value: 'ADVANCED' },
+      { pattern: /expert|professional/i, value: 'EXPERT' }
+    ]
+
+    for (const { pattern, value } of levelPatterns) {
+      if (pattern.test(lowerInput)) {
+        fitnessLevel = value
+        break
+      }
+    }
+
+    return { 
+      days, 
+      sportType, 
+      duration,
+      equipment,
+      fitnessLevel,
+      // Add metadata for better responses
+      requestType: days > 1 ? 'multi-day' : 'single-day',
+      sportName: sportType.replace('_', ' ').toLowerCase(),
+      isQuick: lowerInput.includes('quick') || lowerInput.includes('short'),
+      isIntense: lowerInput.includes('intense') || lowerInput.includes('intensive')
+    }
+  }
+
+  const generateWorkoutPlan = async (request: any) => {
+    if (!user?.id) {
+      return "❌ Please log in to generate workout plans!"
+    }
+
+    const { days, sportType, duration, equipment, fitnessLevel, requestType, sportName, isQuick, isIntense } = request
+
+    try {
+      const today = new Date()
+      const generatedWorkouts = []
+      const totalWorkouts = days
+      let currentWorkout = 0
+
+      // Show initial progress message for multi-day plans
+      if (days > 1) {
+        const progressMessage: ChatMessage = {
+          id: "progress",
+          role: "assistant",
+          content: `🚀 **Starting ${days}-day ${sportName} plan generation...**\n\n📊 **Progress: 0/${totalWorkouts} workouts created**\n\n⏳ This may take a few moments...`,
+          timestamp: new Date(),
+        }
+        setChatMessages((prev) => [...prev.filter(msg => msg.id !== "typing"), progressMessage])
+      }
+
+      for (let i = 0; i < days; i++) {
+        const workoutDate = new Date(today)
+        workoutDate.setDate(today.getDate() + i)
+        
+        try {
+          // Map frontend LLM preference to backend AI preference
+          const aiPreference = llmPreference === 'cloud' ? 'cloud' : 'local'
+          
+          const response = await workoutService.generateWorkoutPlan({
+            sportType,
+            targetDurationMinutes: duration,
+            date: formatDateForAPI(workoutDate),
+            aiPreference: aiPreference
+          }, user.id)
+
+          if (response.data) {
+            generatedWorkouts.push({
+              date: workoutDate.toLocaleDateString(),
+              workout: response.data
+            })
+            currentWorkout++
+
+            // Update progress for multi-day plans
+            if (days > 1) {
+              const progressMessage: ChatMessage = {
+                id: "progress",
+                role: "assistant",
+                content: `🚀 **Generating ${days}-day ${sportName} plan...**\n\n📊 **Progress: ${currentWorkout}/${totalWorkouts} workouts created**\n\n${currentWorkout === totalWorkouts ? '🎉 **Generation complete!**' : '⏳ Working on next workout...'}`,
+                timestamp: new Date(),
+              }
+              setChatMessages((prev) => [...prev.filter(msg => msg.id !== "progress"), progressMessage])
+            }
+          }
+        } catch (error) {
+          console.error(`Error generating workout ${i + 1}:`, error)
+          // Continue with next workout even if one fails
+        }
+      }
+
+      // Remove progress message
+      setChatMessages((prev) => prev.filter(msg => msg.id !== "progress"))
+
+      if (generatedWorkouts.length === 0) {
+        return "❌ Failed to generate workout plan. Please try again."
+      }
+
+      // Format response based on request type
+      const intensity = isIntense ? "INTENSE" : isQuick ? "QUICK" : sportName.toUpperCase()
+      let responseText = `🎉 **${days}-Day ${intensity} Training Plan Generated!**\n\n`
+      
+      if (days === 1) {
+        const workout = generatedWorkouts[0].workout
+        responseText += `📅 **${generatedWorkouts[0].date}**\n`
+        responseText += `💪 **${workout.scheduledExercises?.length || 0} exercises** • **${duration} minutes**\n`
+        responseText += isIntense ? `⚡ **High intensity focus**\n` : isQuick ? `⚡ **Quick & effective**\n` : `🎯 **Balanced training**\n`
+        responseText += `\n${workout.markdownContent ? workout.markdownContent.substring(0, 300) + "..." : "Workout plan created successfully!"}`
+      } else {
+        responseText += `📈 **Generated ${generatedWorkouts.length} out of ${days} requested workouts**\n\n`
+        
+        const failedCount = days - generatedWorkouts.length
+        if (failedCount > 0) {
+          responseText += `⚠️ **${failedCount} workouts failed to generate** - you can try regenerating them individually\n\n`
+        }
+
+        generatedWorkouts.forEach((item, index) => {
+          const workout = item.workout
+          responseText += `📅 **Day ${index + 1}: ${item.date}**\n`
+          responseText += `• ${workout.scheduledExercises?.length || 0} exercises\n`
+          responseText += `• ${duration} minutes\n`
+          responseText += `• Focus: ${workout.focusSportTypeForTheDay.replace('_', ' ')}\n\n`
+        })
+        
+        responseText += `✅ All workouts saved to your calendar! Check the calendar above to view detailed exercise plans.\n\n`
+        responseText += `💡 **Tip:** Click on any date in the calendar to view the full workout details!`
+      }
+
+      // Add all generated workouts to the calendar state
+      generatedWorkouts.forEach(item => {
+        addWorkoutToSessions(item.workout)
+      })
+
+      // Refresh workouts from backend to ensure calendar is up to date
+      await refreshWorkouts()
+
+      // Update current workout if we generated one for today
+      const todayString = getTodayLocalDate()
+      const todayWorkout = generatedWorkouts.find(w => 
+        w.workout.dayDate === todayString
+      )
+      if (todayWorkout) {
+        setCurrentWorkout({
+          id: todayWorkout.workout.id,
+          name: `${sportName.toUpperCase()} Training`,
+          type: WorkoutType.CROSSFIT, // Use local enum for display
+          duration,
+          difficulty: IntensityLevel.MODERATE,
+          equipment: Equipment.BASIC,
+          status: WorkoutStatus.PLANNED,
+          content: todayWorkout.workout.markdownContent || "",
+          date: todayString
+        })
+      }
+
+      return responseText
+
+    } catch (error) {
+      console.error("Error generating workout plan:", error)
+      return "❌ Error generating workout plan. Please check if you're logged in and try again."
+    }
+  }
+
+  const AuthDialog = ({ type }: { type: "login" | "register" }) => {
+    const { login, register } = useAuth()
+    const [formData, setFormData] = useState({
+      email: '',
+      password: '',
+      username: '',
+      dateOfBirth: '',
+      gender: Gender.MALE,
+      heightCm: 0,
+      weightKg: 0
+    })
+    const [isSubmitting, setIsSubmitting] = useState(false)
+    const [error, setError] = useState<string | null>(null)
+    const [detailedError, setDetailedError] = useState<any>(null)
+    const [dialogOpen, setDialogOpen] = useState(false)
+
+    const handleSubmit = async () => {
+      console.group(`🚀 ${type === 'login' ? 'Login' : 'Registration'} Form Submission`);
+      console.log('📋 Form data:', {
+        email: formData.email,
+        username: formData.username,
+        passwordLength: formData.password.length,
+        dateOfBirth: formData.dateOfBirth,
+        gender: formData.gender,
+        heightCm: formData.heightCm,
+        weightKg: formData.weightKg
+      });
+      
+      setIsSubmitting(true)
+      setError(null)
+      setDetailedError(null)
+
+      try {
+        if (type === "login") {
+          console.log('🔑 Attempting login...');
+          const result = await login({
+            email: formData.email,
+            password: formData.password
+          })
+          
+          console.log('📥 Login result:', result);
+          
+          if (result.success) {
+            console.log('✅ Login successful! Closing dialog...');
+            setDialogOpen(false)
+            setFormData({
+              email: '',
+              password: '',
+              username: '',
+              dateOfBirth: '',
+              gender: Gender.MALE,
+              heightCm: 0,
+              weightKg: 0
+            })
+          } else {
+            console.error('❌ Login failed:', result.error);
+            const errorMessage = result.error || 'Invalid email or password. Please check your credentials and try again.';
+            setError(errorMessage)
+            setDetailedError(result)
+            // Ensure dialog stays open on error
+            setDialogOpen(true)
+          }
+        } else {
+          console.log('📝 Attempting registration...');
+          const result = await register({
+            email: formData.email,
+            password: formData.password,
+            username: formData.username,
+            dateOfBirth: formData.dateOfBirth,
+            gender: formData.gender,
+            heightCm: formData.heightCm || undefined,
+            weightKg: formData.weightKg || undefined
+          })
+          
+          console.log('📥 Registration result:', result);
+          
+          if (result.success) {
+            console.log('🎉 Registration successful! Closing dialog...');
+            setDialogOpen(false)
+            setFormData({
+              email: '',
+              password: '',
+              username: '',
+              dateOfBirth: '',
+              gender: Gender.MALE,
+              heightCm: 0,
+              weightKg: 0
+            })
+          } else {
+            console.error('❌ Registration failed:', result.error);
+            const errorMessage = result.error || 'Registration failed. Please check your information and try again.';
+            setError(errorMessage)
+            setDetailedError(result)
+            // Ensure dialog stays open on error
+            setDialogOpen(true)
+          }
+        }
+      } catch (err) {
+        console.error('💥 Unexpected error during submission:', err);
+        const errorMsg = 'An unexpected error occurred. Please check your internet connection and try again.';
+        setError(errorMsg)
+        setDetailedError({ error: errorMsg, exception: err })
+        // Ensure dialog stays open on error
+        setDialogOpen(true)
+      } finally {
+        setIsSubmitting(false)
+        console.groupEnd();
+      }
+    }
+
+    const handleInputChange = (field: string, value: string | number) => {
+      setFormData(prev => ({
+        ...prev,
+        [field]: value
+      }))
+    }
+
+    return (
+      <Dialog open={dialogOpen} onOpenChange={(open) => {
+        setDialogOpen(open);
+        if (open) {
+          // Clear any previous errors when opening dialog
+          setError(null);
+          setDetailedError(null);
+        }
+      }}>
+        <DialogTrigger asChild>
+          <Button 
+            variant={type === "login" ? "outline" : "default"}
+            className={type === "login" ? "bg-white/80 backdrop-blur-sm" : "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"}
+          >
+            {type === "login" ? "Login" : "Register"}
+          </Button>
+        </DialogTrigger>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-center">{type === "login" ? "Welcome Back" : "Join FlexFit"}</DialogTitle>
+          </DialogHeader>
+          <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
+            {error && (
+              <div className="space-y-2">
+                <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-md text-sm">
+                  <div className="font-medium">❌ Error:</div>
+                  <div>{error}</div>
+                  {/* Show validation details if available */}
+                  {detailedError?.error?.details && (
+                    <div className="mt-2 space-y-1">
+                      {Object.entries(detailedError.error.details).map(([field, message]) => (
+                        <div key={field} className="text-xs">
+                          • <span className="font-medium capitalize">{field}:</span> {message}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                
+                {/* Developer info - only show in development */}
+                {process.env.NODE_ENV === 'development' && detailedError && (
+                  <details className="bg-gray-50 border border-gray-200 p-3 rounded-md text-xs">
+                    <summary className="cursor-pointer font-medium text-gray-600">
+                      🔍 Debug Information (Development Only)
+                    </summary>
+                    <div className="mt-2 space-y-1">
+                      <div><strong>Full Error:</strong> {JSON.stringify(detailedError, null, 2)}</div>
+                      <div><strong>Timestamp:</strong> {new Date().toISOString()}</div>
+                      <div><strong>User Agent:</strong> {navigator.userAgent}</div>
+                      <div><strong>Current URL:</strong> {window.location.href}</div>
+                    </div>
+                  </details>
+                )}
+                
+                {/* Helpful tips based on error type */}
+                {error?.includes('CORS') && (
+                  <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-3 py-2 rounded-md text-sm">
+                    <div className="font-medium">💡 Troubleshooting Tips:</div>
+                    <ul className="mt-1 list-disc list-inside space-y-1 text-xs">
+                      <li>Check if the backend server is running on port 8000</li>
+                      <li>Verify CORS is properly configured on the server</li>
+                      <li>Try refreshing the page and trying again</li>
+                    </ul>
+                  </div>
+                )}
+                
+                {error?.includes('Network error') && (
+                  <div className="bg-blue-50 border border-blue-200 text-blue-800 px-3 py-2 rounded-md text-sm">
+                    <div className="font-medium">🌐 Network Issues:</div>
+                    <ul className="mt-1 list-disc list-inside space-y-1 text-xs">
+                      <li>Check your internet connection</li>
+                      <li>Verify the backend server is running</li>
+                      <li>Try again in a few moments</li>
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input 
+                id="email" 
+                type="email" 
+                placeholder="your@email.com"
+                value={formData.email}
+                onChange={(e) => handleInputChange('email', e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleSubmit();
+                  }
+                }}
+                disabled={isSubmitting}
+              />
+              {formData.email && !formData.email.includes('@') && (
+                <p className="text-xs text-amber-600">Please enter a valid email address</p>
+              )}
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input 
+                id="password" 
+                type="password"
+                value={formData.password}
+                onChange={(e) => handleInputChange('password', e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleSubmit();
+                  }
+                }}
+                disabled={isSubmitting}
+                placeholder={type === "register" ? "Min. 8 characters" : ""}
+              />
+              {type === "register" && formData.password && formData.password.length < 8 && (
+                <p className="text-xs text-amber-600">Password must be at least 8 characters long</p>
+              )}
+            </div>
+            
+            {type === "register" && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="username">Username</Label>
+                  <Input 
+                    id="username" 
+                    placeholder="Your Username"
+                    value={formData.username}
+                    onChange={(e) => handleInputChange('username', e.target.value)}
+                    disabled={isSubmitting}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="dateOfBirth">Date of Birth</Label>
+                  <Input 
+                    id="dateOfBirth" 
+                    type="date"
+                    value={formData.dateOfBirth}
+                    onChange={(e) => handleInputChange('dateOfBirth', e.target.value)}
+                    disabled={isSubmitting}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="gender">Gender</Label>
+                  <Select 
+                    value={formData.gender} 
+                    onValueChange={(value) => handleInputChange('gender', value)}
+                    disabled={isSubmitting}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select gender" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={Gender.MALE}>Male</SelectItem>
+                      <SelectItem value={Gender.FEMALE}>Female</SelectItem>
+                      <SelectItem value={Gender.OTHER}>Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="heightCm">Height (cm)</Label>
+                    <Input 
+                      id="heightCm" 
+                      type="number"
+                      placeholder="170"
+                      value={formData.heightCm || ''}
+                      onChange={(e) => handleInputChange('heightCm', parseInt(e.target.value) || 0)}
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="weightKg">Weight (kg)</Label>
+                    <Input 
+                      id="weightKg" 
+                      type="number"
+                      placeholder="70"
+                      value={formData.weightKg || ''}
+                      onChange={(e) => handleInputChange('weightKg', parseFloat(e.target.value) || 0)}
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+            
+            <Button
+              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <>Loading...</>
+              ) : (
+                type === "login" ? "Sign In" : "Create Account"
+              )}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+    )
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="flex items-center justify-center space-x-2">
+            <Dumbbell className="h-8 w-8 text-blue-600 animate-pulse" />
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              FlexFit
+            </h1>
           </div>
-        )}
-        <Button
-          className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-          onClick={() => setIsAuthenticated(true)}
-        >
-          {type === "login" ? "Sign In" : "Create Account"}
-        </Button>
+          <p className="text-gray-600">Loading...</p>
+        </div>
       </div>
-    </DialogContent>
-  )
+    )
+  }
 
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
         <div className="absolute top-4 left-4 flex gap-2">
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button variant="outline" className="bg-white/80 backdrop-blur-sm">
-                Login
-              </Button>
-            </DialogTrigger>
-            <AuthDialog type="login" />
-          </Dialog>
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
-                Register
-              </Button>
-            </DialogTrigger>
-            <AuthDialog type="register" />
-          </Dialog>
+          <AuthDialog type="login" />
+          <AuthDialog type="register" />
         </div>
 
         <div className="flex items-center justify-center min-h-screen">
@@ -898,11 +1593,47 @@ Comprehensive leg and glute workout for strength and power.
                 </h1>
               </div>
               <div className="flex items-center space-x-4">
+                {/* AI Model Preference Selector */}
+                <div className="flex items-center space-x-2">
+                  <Zap className="h-4 w-4 text-purple-600" />
+                  <Select value={llmPreference} onValueChange={(value: 'cloud' | 'local_ollama' | 'local_gpt4all') => setLlmPreference(value)}>
+                    <SelectTrigger className="w-40 h-8 text-xs bg-white/80">
+                      <SelectValue placeholder="AI Model" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="cloud">
+                        <div className="flex items-center space-x-2">
+                          <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                          <span>Cloud AI</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="local_ollama">
+                        <div className="flex items-center space-x-2">
+                          <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                          <span>Local (Ollama)</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="local_gpt4all">
+                        <div className="flex items-center space-x-2">
+                          <div className="w-2 h-2 rounded-full bg-orange-500"></div>
+                          <span>Local (GPT4All)</span>
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
                 <Avatar>
                   <AvatarImage src="/placeholder.svg?height=32&width=32" />
-                  <AvatarFallback>U</AvatarFallback>
+                  <AvatarFallback>
+                    {user?.username?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || 'U'}
+                  </AvatarFallback>
                 </Avatar>
-                <Button variant="outline" onClick={() => setIsAuthenticated(false)} className="bg-white/80">
+                <div className="hidden md:block">
+                  <p className="text-sm font-medium">{user?.username || 'User'}</p>
+                  <p className="text-xs text-gray-600">{user?.email}</p>
+                </div>
+                <Button variant="outline" onClick={logout} className="bg-white/80">
                   Logout
                 </Button>
               </div>
@@ -973,7 +1704,7 @@ Comprehensive leg and glute workout for strength and power.
                     <div className="grid grid-cols-7 gap-1">
                       {calendarDays.map((date, index) => {
                         const status = getDateStatus(date)
-                        const workout = workoutSessions[date.toISOString().split("T")[0]]
+                        const workout = workoutSessions[formatDateForAPI(date)]
                         const isSelected = selectedDate?.toDateString() === date.toDateString()
                         const isCurrentMonth = date.getMonth() === currentMonth.getMonth()
                         const isToday = date.toDateString() === new Date().toDateString()
@@ -1112,6 +1843,39 @@ Comprehensive leg and glute workout for strength and power.
                             <span className="font-semibold">{currentWorkout.type}</span>
                           </div>
                         </div>
+                        
+                        {/* Complete Workout Button */}
+                        {(currentWorkout.status === WorkoutStatus.PLANNED || currentWorkout.status === WorkoutStatus.REST) && (
+                          <Button
+                            onClick={async () => {
+                              try {
+                                const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/workout-plan-service/api/v1/plans/workout/${currentWorkout.id}/complete`, {
+                                  method: 'PUT',
+                                  headers: {
+                                    'Authorization': `Bearer ${localStorage.getItem('flexfit_token')}`
+                                  }
+                                });
+                                if (response.ok) {
+                                  // Refresh workouts to update status
+                                  await loadWorkouts();
+                                }
+                              } catch (error) {
+                                console.error('Failed to complete workout:', error);
+                              }
+                            }}
+                            className="bg-green-600 hover:bg-green-700 text-white text-sm font-medium py-2 px-4 rounded-md transition-colors shadow-lg"
+                          >
+                            ✓ {currentWorkout.status === WorkoutStatus.REST ? 'Complete Rest Day' : 'Complete Workout'}
+                          </Button>
+                        )}
+                        
+                        {/* Completed Status Indicator */}
+                        {currentWorkout.status === WorkoutStatus.COMPLETED && (
+                          <div className="flex items-center space-x-2 text-green-600">
+                            <Check className="h-5 w-5" />
+                            <span className="font-medium text-sm">Completed</span>
+                          </div>
+                        )}
                       </div>
 
                       <Separator />
@@ -1120,6 +1884,7 @@ Comprehensive leg and glute workout for strength and power.
                       <ScrollArea className="h-96">
                         <div className="prose prose-sm max-w-none">
                           <ReactMarkdown
+                            remarkPlugins={[remarkGfm]}
                             components={{
                               h1: ({ children }) => (
                                 <h1 className="text-3xl font-bold text-gray-900 mb-6 flex items-center gap-2 border-b border-gray-200 pb-3">
@@ -1135,9 +1900,7 @@ Comprehensive leg and glute workout for strength and power.
                                 <h3 className="text-lg font-semibold text-gray-700 mb-3 mt-6">{children}</h3>
                               ),
                               table: ({ children }) => (
-                                <div className="overflow-x-auto my-6 shadow-sm rounded-lg border border-gray-200">
-                                  <table className="min-w-full bg-white divide-y divide-gray-200">{children}</table>
-                                </div>
+                                <div className="overflow-x-auto my-6 shadow-sm rounded-lg border border-gray-200">{children}</div>
                               ),
                               th: ({ children }) => (
                                 <th className="px-6 py-3 bg-gradient-to-r from-gray-50 to-gray-100 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-b border-gray-200">
@@ -1308,29 +2071,7 @@ Comprehensive leg and glute workout for strength and power.
                         </Select>
                       </div>
 
-                      <div>
-                        <Label className="text-xs">Time Preference</Label>
-                        <Select
-                          value={userPreferences.timePreference}
-                          onValueChange={(value) =>
-                            setUserPreferences((prev) => ({
-                              ...prev,
-                              timePreference: value as TimePreference,
-                            }))
-                          }
-                        >
-                          <SelectTrigger className="h-8">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {Object.values(TimePreference).map((time) => (
-                              <SelectItem key={time} value={time}>
-                                {time}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
+
 
                       <div>
                         <Label className="text-xs">Intensity Level</Label>
@@ -1380,55 +2121,44 @@ Comprehensive leg and glute workout for strength and power.
                         </Select>
                       </div>
 
-                      <div>
-                        <Label className="text-xs">Dietary Preference</Label>
-                        <Select
-                          value={userPreferences.dietaryPreference}
-                          onValueChange={(value) =>
-                            setUserPreferences((prev) => ({
-                              ...prev,
-                              dietaryPreference: value as DietaryPreference,
-                            }))
-                          }
-                        >
-                          <SelectTrigger className="h-8">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {Object.values(DietaryPreference).map((diet) => (
-                              <SelectItem key={diet} value={diet}>
-                                {diet}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
+
                     </div>
                   </ScrollArea>
                 </CardContent>
               </Card>
 
-              {/* AI Chat Interface */}
+              {/* AI Chat Interface with Direct API Buttons */}
               <Card className="bg-white/80 backdrop-blur-sm">
                 <CardHeader>
                   <CardTitle className="flex items-center space-x-2">
                     <MessageCircle className="h-5 w-5" />
-                    <span>AI Assistant</span>
+                    <span>AI Workout Assistant</span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    <ScrollArea className="h-64 border rounded-lg p-3">
+                    {/* Generation Status */}
+                    {generationStatus && (
+                      <div className={`p-2 rounded-lg text-sm ${
+                        generationStatus.type === 'success' 
+                          ? 'bg-green-50 border border-green-200 text-green-800'
+                          : 'bg-red-50 border border-red-200 text-red-800'
+                      }`}>
+                        {generationStatus.message}
+                      </div>
+                    )}
+
+                    {/* Chat Area */}
+                    <ScrollArea className="h-48 border rounded-lg p-3 bg-gray-50">
                       {chatMessages.length === 0 ? (
-                        <div className="text-center text-gray-500 py-8">
-                          <Heart className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                          <p className="text-sm font-medium">Hi! I'm your fitness AI assistant.</p>
-                          <p className="text-xs mt-1">Ask me to:</p>
+                        <div className="text-center text-gray-500 py-6">
+                          <Heart className="h-6 w-6 mx-auto mb-2 opacity-50" />
+                          <p className="text-sm font-medium">Hi! I'm your fitness assistant.</p>
+                          <p className="text-xs mt-1">Use the buttons above for quick generation, or chat with me below!</p>
                           <ul className="text-xs mt-2 space-y-1">
-                            <li>• Generate new workouts</li>
-                            <li>• Modify existing sessions</li>
-                            <li>• Update your preferences</li>
-                            <li>• Plan your weekly schedule</li>
+                            <li>• Ask about workout modifications</li>
+                            <li>• Get exercise explanations</li>
+                            <li>• Plan your fitness schedule</li>
                           </ul>
                         </div>
                       ) : (
@@ -1439,10 +2169,10 @@ Comprehensive leg and glute workout for strength and power.
                               className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
                             >
                               <div
-                                className={`max-w-[80%] p-3 rounded-lg text-sm ${
+                                className={`max-w-[85%] p-2 rounded-lg text-sm ${
                                   message.role === "user"
                                     ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white"
-                                    : "bg-gray-100 text-gray-800"
+                                    : "bg-white border text-gray-800"
                                 }`}
                               >
                                 {message.content}
@@ -1453,11 +2183,15 @@ Comprehensive leg and glute workout for strength and power.
                       )}
                     </ScrollArea>
 
+                    {/* Chat Input */}
                     <div className="flex space-x-2">
                       <Input
-                        placeholder="Ask me about workouts or preferences..."
+                        placeholder="Additional Request (optional)..."
                         value={chatInput}
-                        onChange={(e) => setChatInput(e.target.value)}
+                        onChange={(e) => {
+                          setChatInput(e.target.value)
+                          setCustomPrompt(e.target.value) // Update custom prompt for API calls
+                        }}
                         onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
                         className="flex-1"
                       />
@@ -1466,6 +2200,37 @@ Comprehensive leg and glute workout for strength and power.
                         className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
                       >
                         <Send className="h-4 w-4" />
+                      </Button>
+                    </div>
+
+                    {/* Quick Generation Buttons */}
+                    <div className="grid grid-cols-3 gap-2">
+                      <Button
+                        onClick={handleGenerateDailyWorkout}
+                        disabled={isGenerating}
+                        className="bg-blue-600 hover:bg-blue-700 text-white py-2"
+                        size="sm"
+                      >
+                        <Zap className="h-3 w-3 mr-1" />
+                        {isGenerating ? 'Generating...' : 'Daily Workout'}
+                      </Button>
+                      <Button
+                        onClick={handleGenerateWeeklyWorkout}
+                        disabled={isGenerating}
+                        className="bg-green-600 hover:bg-green-700 text-white py-2"
+                        size="sm"
+                      >
+                        <CalendarIcon className="h-3 w-3 mr-1" />
+                        {isGenerating ? 'Generating...' : 'Weekly Plan'}
+                      </Button>
+                      <Button
+                        onClick={handleGenerateQueueWeeklyWorkout}
+                        disabled={isGenerating}
+                        className="bg-purple-600 hover:bg-purple-700 text-white py-2"
+                        size="sm"
+                      >
+                        <CalendarIcon className="h-3 w-3 mr-1" />
+                        {isGenerating ? 'Generating...' : 'Queue Weekly'}
                       </Button>
                     </div>
                   </div>

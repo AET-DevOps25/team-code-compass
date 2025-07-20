@@ -1,0 +1,47 @@
+# Development overrides - builds from source code for local development
+# Automatically used with 'docker compose up'
+version: '3.8'
+
+services:
+  service-registry:
+    build: 
+      context: ./server/service-registry
+      dockerfile: Dockerfile
+    
+  api-gateway:
+    build: 
+      context: ./server/api-gateway
+      dockerfile: Dockerfile
+    
+  user-service:
+    build: 
+      context: ./server/user-service
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8081"  # Expose for debugging
+    
+  workout-plan-service:
+    build: 
+      context: ./server/workout-plan-service
+      dockerfile: Dockerfile
+    ports:
+      - "8082:8082"  # Expose for debugging
+    
+  genai-workout-worker:
+    build: 
+      context: ./genai
+      dockerfile: Dockerfile
+    
+  genai-workout-worker-local:
+    build:
+      context: ./genai
+      dockerfile: Dockerfile.local
+    volumes:
+      - ./genai/models:/app/models:ro  # Local model directory
+    
+  frontend:
+    build: 
+      context: ./client
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8080

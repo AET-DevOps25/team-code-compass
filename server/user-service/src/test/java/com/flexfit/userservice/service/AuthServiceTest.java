@@ -2,9 +2,9 @@ package com.flexfit.userservice.service;
 
 import com.flexfit.userservice.dto.AuthResponse;
 import com.flexfit.userservice.dto.LoginRequest;
-import com.flexfit.userservice.dto.UserRegistrationRequest;
 import com.flexfit.userservice.dto.UserResponse;
 import com.flexfit.userservice.models.User;
+import com.flexfit.userservice.models.UserPreferences;
 import com.flexfit.userservice.models.enums.Gender;
 import com.flexfit.userservice.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -14,9 +14,10 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -40,271 +41,203 @@ class AuthServiceTest {
     private AuthServiceImpl authService;
 
     private User testUser;
-    private UserRegistrationRequest registrationRequest;
     private LoginRequest loginRequest;
+    private UserResponse userResponse;
 
     @BeforeEach
     void setUp() {
+        // Set up test JWT secret for token generation
+        ReflectionTestUtils.setField(authService, "jwtSecret", "test-secret-key-that-is-at-least-32-characters-long-for-hmac-sha256");
+        ReflectionTestUtils.setField(authService, "jwtExpirationInSeconds", 3600);
+
         testUser = new User();
         testUser.setId(UUID.randomUUID());
         testUser.setUsername("testuser");
         testUser.setEmail("test@example.com");
-        testUser.setPassword("encodedPassword");
-        testUser.setFirstName("Test");
-        testUser.setLastName("User");
+        testUser.setPasswordHash("encodedPassword");
         testUser.setDateOfBirth(LocalDate.of(1990, 1, 1));
-        testUser.setAge(33);
         testUser.setGender(Gender.MALE);
-        testUser.setHeight(180);
-        testUser.setWeight(75);
+        testUser.setHeightCm(180);
+        testUser.setWeightKg(75.0);
+        testUser.setCreatedAt(LocalDateTime.now());
 
-        registrationRequest = new UserRegistrationRequest(
-            "testuser",
-            "test@example.com",
-            "password123",
-            "Test",
-            "User",
-            LocalDate.of(1990, 1, 1),
-            33,
-            Gender.MALE,
-            180,
-            75
-        );
+        // Create preferences for the user
+        UserPreferences preferences = new UserPreferences();
+        preferences.setId(testUser.getId());
+        preferences.setUser(testUser);
+        testUser.setPreferences(preferences);
 
-        loginRequest = new LoginRequest("test@example.com", "password123");
+        loginRequest = new LoginRequest();
+        loginRequest.setEmail("test@example.com");
+        loginRequest.setPassword("password123");
+
+        userResponse = new UserResponse();
+        userResponse.setId(testUser.getId());
+        userResponse.setUsername(testUser.getUsername());
+        userResponse.setEmail(testUser.getEmail());
+        userResponse.setDateOfBirth(testUser.getDateOfBirth());
+        userResponse.setHeightCm(testUser.getHeightCm());
+        userResponse.setWeightKg(testUser.getWeightKg());
+        userResponse.setGender(testUser.getGender());
+        userResponse.setCreatedAt(testUser.getCreatedAt());
     }
 
     @Test
-    void registerUser_Success() {
+    void login_Success() {
         // Given
-        when(userRepository.existsByEmail(registrationRequest.email())).thenReturn(false);
-        when(userRepository.existsByUsername(registrationRequest.username())).thenReturn(false);
-        when(passwordEncoder.encode(registrationRequest.password())).thenReturn("encodedPassword");
-        when(userRepository.save(any(User.class))).thenReturn(testUser);
+        when(userRepository.findByEmail(loginRequest.getEmail())).thenReturn(Optional.of(testUser));
+        when(passwordEncoder.matches(loginRequest.getPassword(), testUser.getPasswordHash())).thenReturn(true);
+        when(userService.getUserById(testUser.getId())).thenReturn(Optional.of(userResponse));
 
         // When
-        UserResponse result = authService.registerUser(registrationRequest);
+        AuthResponse result = authService.login(loginRequest);
 
         // Then
         assertNotNull(result);
-        assertEquals("testuser", result.username());
-        assertEquals("test@example.com", result.email());
-        assertEquals("Test", result.firstName());
-        assertEquals("User", result.lastName());
-        assertEquals(Gender.MALE, result.gender());
-        assertEquals(180, result.heightCm());
-        assertEquals(75, result.weightKg());
-
-        verify(userRepository).existsByEmail("test@example.com");
-        verify(userRepository).existsByUsername("testuser");
-        verify(passwordEncoder).encode("password123");
-        verify(userRepository).save(any(User.class));
-    }
-
-    @Test
-    void registerUser_EmailAlreadyExists() {
-        // Given
-        when(userRepository.existsByEmail(registrationRequest.email())).thenReturn(true);
-
-        // When & Then
-        IllegalArgumentException exception = assertThrows(
-            IllegalArgumentException.class,
-            () -> authService.registerUser(registrationRequest)
-        );
-        assertEquals("Email already exists", exception.getMessage());
-
-        verify(userRepository).existsByEmail("test@example.com");
-        verify(userRepository, never()).existsByUsername(anyString());
-        verify(passwordEncoder, never()).encode(anyString());
-        verify(userRepository, never()).save(any(User.class));
-    }
-
-    @Test
-    void registerUser_UsernameAlreadyExists() {
-        // Given
-        when(userRepository.existsByEmail(registrationRequest.email())).thenReturn(false);
-        when(userRepository.existsByUsername(registrationRequest.username())).thenReturn(true);
-
-        // When & Then
-        IllegalArgumentException exception = assertThrows(
-            IllegalArgumentException.class,
-            () -> authService.registerUser(registrationRequest)
-        );
-        assertEquals("Username already exists", exception.getMessage());
-
-        verify(userRepository).existsByEmail("test@example.com");
-        verify(userRepository).existsByUsername("testuser");
-        verify(passwordEncoder, never()).encode(anyString());
-        verify(userRepository, never()).save(any(User.class));
-    }
-
-    @Test
-    void authenticate_Success() {
-        // Given
-        when(userRepository.findByEmail(loginRequest.email())).thenReturn(Optional.of(testUser));
-        when(passwordEncoder.matches(loginRequest.password(), testUser.getPassword())).thenReturn(true);
-
-        // When
-        AuthResponse result = authService.authenticate(loginRequest);
-
-        // Then
-        assertNotNull(result);
-        assertNotNull(result.token());
-        assertNotNull(result.user());
-        assertEquals("test@example.com", result.user().email());
-        assertEquals("Authentication successful", result.message());
+        assertNotNull(result.getToken());
+        assertEquals("Bearer", result.getTokenType());
+        assertEquals("Login successful", result.getMessage());
+        assertNotNull(result.getUser());
+        assertEquals("test@example.com", result.getUser().getEmail());
+        assertEquals("testuser", result.getUser().getUsername());
 
         verify(userRepository).findByEmail("test@example.com");
         verify(passwordEncoder).matches("password123", "encodedPassword");
+        verify(userService).getUserById(testUser.getId());
     }
 
     @Test
-    void authenticate_UserNotFound() {
+    void login_UserNotFound() {
         // Given
-        when(userRepository.findByEmail(loginRequest.email())).thenReturn(Optional.empty());
+        when(userRepository.findByEmail(loginRequest.getEmail())).thenReturn(Optional.empty());
 
         // When & Then
-        BadCredentialsException exception = assertThrows(
-            BadCredentialsException.class,
-            () -> authService.authenticate(loginRequest)
+        IllegalArgumentException exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> authService.login(loginRequest)
         );
         assertEquals("Invalid email or password", exception.getMessage());
 
         verify(userRepository).findByEmail("test@example.com");
         verify(passwordEncoder, never()).matches(anyString(), anyString());
+        verify(userService, never()).getUserById(any());
     }
 
     @Test
-    void authenticate_InvalidPassword() {
+    void login_InvalidPassword() {
         // Given
-        when(userRepository.findByEmail(loginRequest.email())).thenReturn(Optional.of(testUser));
-        when(passwordEncoder.matches(loginRequest.password(), testUser.getPassword())).thenReturn(false);
+        when(userRepository.findByEmail(loginRequest.getEmail())).thenReturn(Optional.of(testUser));
+        when(passwordEncoder.matches(loginRequest.getPassword(), testUser.getPasswordHash())).thenReturn(false);
 
         // When & Then
-        BadCredentialsException exception = assertThrows(
-            BadCredentialsException.class,
-            () -> authService.authenticate(loginRequest)
+        IllegalArgumentException exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> authService.login(loginRequest)
         );
         assertEquals("Invalid email or password", exception.getMessage());
 
         verify(userRepository).findByEmail("test@example.com");
         verify(passwordEncoder).matches("password123", "encodedPassword");
+        verify(userService, never()).getUserById(any());
     }
 
     @Test
     void registerAndLogin_Success() {
         // Given
-        when(userRepository.existsByEmail(registrationRequest.email())).thenReturn(false);
-        when(userRepository.existsByUsername(registrationRequest.username())).thenReturn(false);
-        when(passwordEncoder.encode(registrationRequest.password())).thenReturn("encodedPassword");
-        when(userRepository.save(any(User.class))).thenReturn(testUser);
-        when(passwordEncoder.matches(registrationRequest.password(), testUser.getPassword())).thenReturn(true);
+        String email = "test@example.com";
+        String password = "password123";
+        
+        when(userRepository.findByEmail(email)).thenReturn(Optional.of(testUser));
+        when(passwordEncoder.matches(password, testUser.getPasswordHash())).thenReturn(true);
+        when(userService.getUserById(testUser.getId())).thenReturn(Optional.of(userResponse));
 
         // When
-        AuthResponse result = authService.registerAndLogin(registrationRequest);
+        AuthResponse result = authService.registerAndLogin(email, password);
 
         // Then
         assertNotNull(result);
-        assertNotNull(result.token());
-        assertNotNull(result.user());
-        assertEquals("test@example.com", result.user().email());
-        assertEquals("Registration and login successful", result.message());
+        assertNotNull(result.getToken());
+        assertEquals("Bearer", result.getTokenType());
+        assertEquals("Login successful", result.getMessage());
+        assertNotNull(result.getUser());
+        assertEquals(email, result.getUser().getEmail());
 
-        verify(userRepository).existsByEmail("test@example.com");
-        verify(userRepository).existsByUsername("testuser");
-        verify(passwordEncoder).encode("password123");
-        verify(userRepository).save(any(User.class));
-        verify(passwordEncoder).matches("password123", "encodedPassword");
+        verify(userRepository).findByEmail(email);
+        verify(passwordEncoder).matches(password, "encodedPassword");
+        verify(userService).getUserById(testUser.getId());
     }
 
     @Test
-    void registerAndLogin_RegistrationFails() {
+    void registerAndLogin_UserNotFound() {
         // Given
-        when(userRepository.existsByEmail(registrationRequest.email())).thenReturn(true);
+        String email = "nonexistent@example.com";
+        String password = "password123";
+        
+        when(userRepository.findByEmail(email)).thenReturn(Optional.empty());
 
         // When & Then
         IllegalArgumentException exception = assertThrows(
             IllegalArgumentException.class,
-            () -> authService.registerAndLogin(registrationRequest)
+            () -> authService.registerAndLogin(email, password)
         );
-        assertEquals("Email already exists", exception.getMessage());
+        assertEquals("Invalid email or password", exception.getMessage());
 
-        verify(userRepository).existsByEmail("test@example.com");
-        verify(userRepository, never()).save(any(User.class));
+        verify(userRepository).findByEmail(email);
+        verify(passwordEncoder, never()).matches(anyString(), anyString());
+        verify(userService, never()).getUserById(any());
     }
 
     @Test
-    void validateUserData_ValidData() {
-        // Given
-        UserRegistrationRequest validRequest = new UserRegistrationRequest(
-            "validuser",
-            "valid@example.com",
-            "validPassword123",
-            "Valid",
-            "User",
-            LocalDate.of(1990, 1, 1),
-            33,
-            Gender.MALE,
-            180,
-            75
-        );
-
-        // When & Then
-        assertDoesNotThrow(() -> {
-            // This would be a private method validation if exposed
-            // For now, we test through the public methods
-            when(userRepository.existsByEmail(validRequest.email())).thenReturn(false);
-            when(userRepository.existsByUsername(validRequest.username())).thenReturn(false);
-            when(passwordEncoder.encode(validRequest.password())).thenReturn("encodedPassword");
-            when(userRepository.save(any(User.class))).thenReturn(testUser);
-            
-            authService.registerUser(validRequest);
-        });
-    }
-
-    @Test
-    void validateUserData_InvalidEmail() {
-        // Given
-        UserRegistrationRequest invalidRequest = new UserRegistrationRequest(
-            "testuser",
-            "invalid-email",
-            "password123",
-            "Test",
-            "User",
-            LocalDate.of(1990, 1, 1),
-            33,
-            Gender.MALE,
-            180,
-            75
-        );
-
-        // When & Then
-        // This would typically be handled by validation annotations
-        // but we can test the service behavior
-        when(userRepository.existsByEmail(invalidRequest.email())).thenReturn(false);
-        when(userRepository.existsByUsername(invalidRequest.username())).thenReturn(false);
-        when(passwordEncoder.encode(invalidRequest.password())).thenReturn("encodedPassword");
-        when(userRepository.save(any(User.class))).thenReturn(testUser);
-
-        // The service should still work, validation would be at controller level
-        assertDoesNotThrow(() -> authService.registerUser(invalidRequest));
-    }
-
-    @Test
-    void authenticate_NullLoginRequest() {
+    void login_NullLoginRequest() {
         // When & Then
         assertThrows(
             NullPointerException.class,
-            () -> authService.authenticate(null)
+            () -> authService.login(null)
         );
+
+        verify(userRepository, never()).findByEmail(anyString());
+        verify(passwordEncoder, never()).matches(anyString(), anyString());
+        verify(userService, never()).getUserById(any());
     }
 
     @Test
-    void registerUser_NullRegistrationRequest() {
+    void login_EmptyEmail() {
+        // Given
+        LoginRequest emptyEmailRequest = new LoginRequest();
+        emptyEmailRequest.setEmail("");
+        emptyEmailRequest.setPassword("password123");
+
+        when(userRepository.findByEmail("")).thenReturn(Optional.empty());
+
         // When & Then
-        assertThrows(
-            NullPointerException.class,
-            () -> authService.registerUser(null)
+        IllegalArgumentException exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> authService.login(emptyEmailRequest)
         );
+        assertEquals("Invalid email or password", exception.getMessage());
+
+        verify(userRepository).findByEmail("");
+        verify(passwordEncoder, never()).matches(anyString(), anyString());
+    }
+
+    @Test
+    void login_EmptyPassword() {
+        // Given
+        LoginRequest emptyPasswordRequest = new LoginRequest();
+        emptyPasswordRequest.setEmail("test@example.com");
+        emptyPasswordRequest.setPassword("");
+
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
+        when(passwordEncoder.matches("", testUser.getPasswordHash())).thenReturn(false);
+
+        // When & Then
+        IllegalArgumentException exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> authService.login(emptyPasswordRequest)
+        );
+        assertEquals("Invalid email or password", exception.getMessage());
+
+        verify(userRepository).findByEmail("test@example.com");
+        verify(passwordEncoder).matches("", "encodedPassword");
     }
 } 

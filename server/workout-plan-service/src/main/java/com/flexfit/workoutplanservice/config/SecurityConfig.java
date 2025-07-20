@@ -14,15 +14,17 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
+                .csrf(csrf -> csrf.disable())
+                // CORS is handled by API Gateway - disabling here to prevent duplicate headers
+                // .cors(cors -> cors.and()) 
                 .authorizeHttpRequests(authorize -> authorize
                         // Allow public access to swagger endpoints for testing
-                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/v3/api-docs/swagger-config").permitAll()
                         // For development: Allow all requests (disable authentication)
                         .anyRequest().permitAll()
                 )
                 // Disable OAuth2 JWT for development
                 // .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> {}))
-                .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
 
         return http.build();

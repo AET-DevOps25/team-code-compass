@@ -10,6 +10,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.http.HttpMethod;
 
 @Configuration
 @EnableWebSecurity
@@ -21,7 +22,12 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
+            .csrf(csrf -> csrf.disable())
+            // CORS is handled by API Gateway - disabling here to prevent duplicate headers
+            // .cors(cors -> cors.and()) 
             .authorizeHttpRequests(authorize -> authorize
+                // Allow all OPTIONS requests (for CORS preflight)
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 // Allow public access to registration, login, and swagger endpoints
                 .requestMatchers(
                     "/api/v1/users/register", 
@@ -33,6 +39,7 @@ public class SecurityConfig {
                     "/swagger-ui.html",
                     "/v3/api-docs/**",
                     "/v3/api-docs",
+                    "/v3/api-docs/swagger-config",
                     "/swagger-resources/**",
                     "/webjars/**",
                     "/actuator/**"
@@ -44,7 +51,6 @@ public class SecurityConfig {
             .oauth2ResourceServer(oauth2 -> oauth2
                 .jwt(jwt -> jwt.decoder(jwtDecoder))
             )
-            .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
 
         return http.build();

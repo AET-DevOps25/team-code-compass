@@ -1,184 +1,228 @@
+# Production docker-compose using GitHub Container Registry images
+version: '3.8'
+
 services:
-  # FlexFit Client - Static Next.js App
-  client:
-    build:
-      context: ./client
-      dockerfile: Dockerfile
-    container_name: flexfit-client
-    restart: always
+  # PostgreSQL Database
+  db:
+    image: postgres:13
+    container_name: flexfit-db
+    environment:
+      - POSTGRES_DB=flexfit
+      - POSTGRES_USER=flexfit
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-flexfit123}
     ports:
-      - "3000:80"
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - flexfit-network
+    restart: unless-stopped
+
+  # Eureka Service Registry
+  service-registry:
+    image: ghcr.io/aet-devops25/team-code-compass/service-registry:${IMAGE_TAG:-latest}
+    container_name: flexfit-service-registry
+    ports:
+      - "8761:8761"
     networks:
       - flexfit-network
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost/health || exit 1"]
+      test: ["CMD", "curl", "-f", "http://localhost:8761/actuator/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 30s
-
-  # Service Registry (Eureka Server)
-  service-registry:
-    build:
-      context: ./server/service-registry
-      dockerfile: Dockerfile
-    container_name: flexfit-service-registry
-    restart: always
-    ports:
-      - "8761:8761"
-    environment:
-      SPRING_PROFILES_ACTIVE: docker
-    networks:
-      - flexfit-network
-    healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8761/actuator/health || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
+    restart: unless-stopped
 
   # API Gateway
   api-gateway:
-    build:
-      context: ./server/api-gateway
-      dockerfile: Dockerfile
+    image: ghcr.io/aet-devops25/team-code-compass/api-gateway:${IMAGE_TAG:-latest}
     container_name: flexfit-api-gateway
-    restart: always
     ports:
-      - "8000:8000"
-    environment:
-      SPRING_PROFILES_ACTIVE: docker
-      EUREKA_SERVER: http://service-registry:8761/eureka
+      - "8080:8000"
     depends_on:
-      service-registry:
-        condition: service_healthy
+      - service-registry
     networks:
       - flexfit-network
+    environment:
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://service-registry:8761/eureka
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8000/actuator/health || exit 1"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/actuator/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+    restart: unless-stopped
 
-  postgres:
-    image: postgres:16
-    container_name: flexfit-postgres
-    restart: always
-    environment:
-      # These environment variables are used to initialize the PostgreSQL database.
-      # The values are loaded from the .env file for security and flexibility.
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
-    ports:
-      # Maps the container's port 5432 to the host's port 5432.
-      # This allows external connections to the database if needed.
-      - "5432:5432"
-    volumes:
-      # Persists the database data on the host machine, so you don't lose data
-      # when the container is stopped or removed.
-      - postgres-data:/var/lib/postgresql/data
-    networks:
-      - flexfit-network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
+  # User Service
   user-service:
-    build:
-      context: ./server/user-service
-      dockerfile: Dockerfile
+    image: ghcr.io/aet-devops25/team-code-compass/user-service:${IMAGE_TAG:-latest}
     container_name: flexfit-user-service
-    restart: always
-    environment:
-      # Database connection settings
-      DB_HOST: postgres
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
-      # Spring profiles
-      SPRING_PROFILES_ACTIVE: docker
-      # Eureka configuration
-      EUREKA_SERVER: http://service-registry:8761/eureka
-    ports:
-      # Maps the container's port 8081 to the host's port 8081
-      - "8081:8081"
     depends_on:
-      postgres:
-        condition: service_healthy
-      service-registry:
-        condition: service_healthy
+      - db
+      - service-registry
     networks:
       - flexfit-network
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/flexfit
+      - SPRING_DATASOURCE_USERNAME=flexfit
+      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD:-flexfit123}
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://service-registry:8761/eureka
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8081/actuator/health || exit 1"]
+      test: ["CMD", "curl", "-f", "http://localhost:8081/actuator/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+    restart: unless-stopped
 
-      # This section defines the new service for managing workout plans.
+  # Workout Plan Service
   workout-plan-service:
-    build:
-      context: ./server/workout-plan-service 
-      dockerfile: Dockerfile
+    image: ghcr.io/aet-devops25/team-code-compass/workout-plan-service:${IMAGE_TAG:-latest}
     container_name: flexfit-workout-plan-service
-    restart: always
-    environment:
-      DB_HOST: postgres
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
-      SPRING_PROFILES_ACTIVE: docker
-      # Eureka configuration
-      EUREKA_SERVER: http://service-registry:8761/eureka
-    ports:
-      # Exposing this service on port 8082
-      - "8082:8082"
     depends_on:
-      postgres:
-        condition: service_healthy # Ensures the database is ready before starting
-      service-registry:
-        condition: service_healthy
+      - db
+      - service-registry
     networks:
       - flexfit-network
-    healthcheck:
-      # Checks if the service's actuator health endpoint is responsive.
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8082/actuator/health || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s # Gives the service extra time to start up initially
-
-  # GenAI Workout Worker
-  genai-workout-worker:
-    build:
-      context: ./genai # Correct path to genai directory
-      dockerfile: Dockerfile
-    container_name: flexfit-genai-workout-worker
-    restart: always
     environment:
-      CHAIR_API_KEY: ${CHAIR_API_KEY}
-      PORT: 8083
-    ports:
-      - "8083:8083"
-    networks:
-      - flexfit-network
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/flexfit
+      - SPRING_DATASOURCE_USERNAME=flexfit
+      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD:-flexfit123}
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://service-registry:8761/eureka
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8083/health || exit 1"]
+      test: ["CMD", "curl", "-f", "http://localhost:8082/actuator/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 30s
+    restart: unless-stopped
 
-# Defines the shared network for all services
+  # GenAI Workout Worker (Cloud - Open WebUI)
+  genai-workout-worker:
+    image: ghcr.io/aet-devops25/team-code-compass/genai-worker:${IMAGE_TAG:-latest}
+    container_name: flexfit-genai-worker
+    ports:
+      - "8083:8000"
+    networks:
+      - flexfit-network
+    environment:
+      - OPEN_WEBUI_BASE_URL=${OPEN_WEBUI_BASE_URL:-https://gpu.aet.cit.tum.de}
+      - CHAIR_API_KEY=${CHAIR_API_KEY}
+      - MODEL_NAME=${MODEL_NAME:-llama3.3:latest}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # GenAI Workout Worker (Local - GPT4All/Ollama)
+  genai-workout-worker-local:
+    image: ghcr.io/aet-devops25/team-code-compass/genai-worker-local:${IMAGE_TAG:-latest}
+    container_name: flexfit-genai-worker-local
+    ports:
+      - "8084:8084"
+    networks:
+      - flexfit-network
+    environment:
+      - LOCAL_MODEL_TYPE=${LOCAL_MODEL_TYPE:-mock}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://localhost:11434}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama2}
+      - GPT4ALL_MODEL_PATH=${GPT4ALL_MODEL_PATH:-/app/models/ggml-gpt4all-j-v1.3-groovy.bin}
+      - MOCK_MODE=${MOCK_MODE:-true}
+    volumes:
+      - genai_models:/app/models:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8084/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # Frontend
+  frontend:
+    image: ghcr.io/aet-devops25/team-code-compass/frontend:${IMAGE_TAG:-latest}
+    container_name: flexfit-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - api-gateway
+    networks:
+      - flexfit-network
+    environment:
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8080}
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # Prometheus monitoring
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: flexfit-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus:/etc/prometheus
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    networks:
+      - flexfit-network
+    depends_on:
+      - user-service
+      - workout-plan-service
+      - api-gateway
+
+  # Grafana dashboards
+  grafana:
+    image: grafana/grafana:latest
+    container_name: flexfit-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+    networks:
+      - flexfit-network
+    depends_on:
+      - prometheus
+
+  # Alertmanager for notifications
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: flexfit-alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./monitoring/alertmanager:/etc/alertmanager
+      - alertmanager_data:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+      - '--web.external-url=http://localhost:9093'
+    networks:
+      - flexfit-network
+    depends_on:
+      - prometheus
+
 networks:
   flexfit-network:
     driver: bridge
 
 volumes:
-  # Defines the named volume for data persistence.
-  postgres-data:
+  postgres_data:
+  genai_models:
+  prometheus_data:
+  grafana_data:
+  alertmanager_data:

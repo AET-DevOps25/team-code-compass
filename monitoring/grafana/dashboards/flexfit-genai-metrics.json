@@ -1,0 +1,85 @@
+{
+  "id": null,
+  "title": "FlexFit GenAI Metrics",
+    "tags": ["flexfit", "genai", "ai"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "GenAI Service Availability",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "up{job=~'genai-worker.*'}",
+            "legendFormat": "{{job}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "GenAI Request Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(genai_requests_total[5m])",
+            "legendFormat": "Cloud GenAI"
+          },
+          {
+            "expr": "rate(genai_local_requests_total[5m])",
+            "legendFormat": "Local GenAI"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "GenAI Response Time Comparison",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(genai_generation_duration_seconds_bucket[5m]))",
+            "legendFormat": "Cloud GenAI - 95th percentile"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(genai_local_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "Local GenAI - 95th percentile"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 8}
+      },
+      {
+        "id": 4,
+        "title": "Total Workout Generations",
+        "type": "singlestat",
+        "targets": [
+          {
+            "expr": "sum(genai_workout_generations_total)",
+            "legendFormat": "Total Generations"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16}
+      },
+      {
+        "id": 5,
+        "title": "GenAI Error Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(genai_requests_total{status=~'5..'}[5m]) / rate(genai_requests_total[5m]) * 100",
+            "legendFormat": "Cloud GenAI Error Rate"
+          },
+          {
+            "expr": "rate(genai_local_requests_total{status=~'5..'}[5m]) / rate(genai_local_requests_total[5m]) * 100",
+            "legendFormat": "Local GenAI Error Rate"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16}
+      }
+    ],
+    "time": {
+      "from": "now-15m",
+      "to": "now"
+    },
+    "refresh": "5s"
+} 
