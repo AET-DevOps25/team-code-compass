@@ -109,6 +109,84 @@ services:
       timeout: 10s
       retries: 3
 
+  # GenAI Local Workout Worker (Local LLMs + Weaviate RAG)
+  genai-workout-worker-local:
+    build: 
+      context: ./genai
+      dockerfile: Dockerfile.local
+    container_name: flexfit-genai-worker-local
+    ports:
+      - "8001:8001"
+    networks:
+      - flexfit-network
+    environment:
+      # Local LLM Configuration
+      - LOCAL_LLM_TYPE=ollama
+      - LOCAL_MODEL_NAME=llama3
+      - OLLAMA_HOST=http://ollama:11434
+      # Weaviate RAG Configuration
+      - WEAVIATE_URL=http://weaviate:8080
+      - EMBEDDING_MODEL=all-MiniLM-L6-v2
+      # - MOCK_MODE=true  # Enable for faster testing
+    depends_on:
+      - weaviate
+      - ollama
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Ollama Local LLM Service
+  ollama:
+    image: ollama/ollama:latest
+    container_name: flexfit-ollama
+    ports:
+      - "11434:11434"
+    networks:
+      - flexfit-network
+    volumes:
+      - ollama_data:/root/.ollama
+    command: serve
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    # For systems without GPU, comment out the deploy section above
+
+  # Weaviate Vector Database
+  weaviate:
+    image: semitechnologies/weaviate:1.22.4
+    container_name: flexfit-weaviate
+    ports:
+      - "8080:8080"
+    networks:
+      - flexfit-network
+    environment:
+      QUERY_DEFAULTS_LIMIT: 25
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
+      PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
+      DEFAULT_VECTORIZER_MODULE: 'none'
+      ENABLE_MODULES: 'text2vec-transformers'
+      TRANSFORMERS_INFERENCE_API: http://t2v-transformers:8080
+      CLUSTER_HOSTNAME: 'node1'
+    volumes:
+      - weaviate_data:/var/lib/weaviate
+    depends_on:
+      - t2v-transformers
+
+  # Text2Vec Transformers for Weaviate
+  t2v-transformers:
+    image: semitechnologies/transformers-inference:sentence-transformers-all-MiniLM-L6-v2
+    container_name: flexfit-t2v-transformers
+    networks:
+      - flexfit-network
+    environment:
+      ENABLE_CUDA: '0'  # Set to '1' if using GPU
+
   # Next.js Frontend
   frontend:
     build: ./client
@@ -133,3 +211,5 @@ networks:
 
 volumes:
   postgres_data:
+  ollama_data:
+  weaviate_data:

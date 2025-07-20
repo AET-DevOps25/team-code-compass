@@ -424,6 +424,7 @@ export default function FlexFitApp() {
         dayDate: new Date().toISOString().split('T')[0],
         focusSportType: mapWorkoutTypeToSportType(userPreferences.preferredWorkouts[0]),
         targetDurationMinutes: userPreferences.workoutDuration,
+        aiPreference: llmPreference, // NEW: Send AI preference to backend
         ...(customPrompt.trim() && { textPrompt: customPrompt.trim() })
       }
 
@@ -664,6 +665,7 @@ export default function FlexFitApp() {
              dayPlan.sportType === 'RUNNING_INTERVALS' ? WorkoutServiceSportType.RUNNING_INTERVALS :
              WorkoutServiceSportType.STRENGTH),
           targetDurationMinutes: dayPlan.isRest ? 15 : userPreferences.workoutDuration,
+          aiPreference: llmPreference, // NEW: Send AI preference for queue generation
           ...(enhancedPrompt && { textPrompt: enhancedPrompt })
         }
 
@@ -1853,9 +1855,7 @@ export default function FlexFitApp() {
                                 <h3 className="text-lg font-semibold text-gray-700 mb-3 mt-6">{children}</h3>
                               ),
                               table: ({ children }) => (
-                                <div className="overflow-x-auto my-6 shadow-sm rounded-lg border border-gray-200">
-                                  <table className="min-w-full bg-white divide-y divide-gray-200">{children}</table>
-                                </div>
+                                <div className="overflow-x-auto my-6 shadow-sm rounded-lg border border-gray-200">{children}</div>
                               ),
                               th: ({ children }) => (
                                 <th className="px-6 py-3 bg-gradient-to-r from-gray-50 to-gray-100 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-b border-gray-200">

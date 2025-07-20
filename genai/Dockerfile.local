@@ -1,0 +1,37 @@
+FROM python:3.11-slim
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+
+# Install system dependencies
+WORKDIR /app
+
+# Install curl for health checks and system dependencies
+RUN apt-get update && \
+    apt-get install -y curl build-essential && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy requirements and install Python dependencies
+COPY requirements-local.txt .
+RUN pip install --no-cache-dir -r requirements-local.txt
+
+# Copy application code
+COPY workout-worker-local.py .
+
+# Create directories for models and knowledge base
+RUN mkdir -p models knowledge_base
+
+# Copy knowledge base files (this will work even if directory has files now)
+COPY knowledge_base/ ./knowledge_base/
+
+# Expose port 8001 (different from cloud worker)
+EXPOSE 8001
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8001/health || exit 1
+
+# Run the application
+CMD ["python", "workout-worker-local.py"] 

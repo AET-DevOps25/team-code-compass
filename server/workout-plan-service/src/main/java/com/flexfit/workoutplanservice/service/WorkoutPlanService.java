@@ -49,6 +49,10 @@ public class WorkoutPlanService {
     @Qualifier("genaiSvcRestTemplate")
     private final RestTemplate genaiSvcRestTemplate;
 
+    // NEW: Local GenAI service REST template
+    @Qualifier("genaiLocalSvcRestTemplate")
+    private final RestTemplate genaiLocalSvcRestTemplate;
+
     // Helper methods for safe enum parsing
     private SportType parseSportType(String sportTypeStr) {
         try {
@@ -92,7 +96,7 @@ public class WorkoutPlanService {
         PromptContext promptContext = buildPromptContext(user, request);
 
         // Step 3: Call the Python genai-service with the prompt
-        GenAIResponse genAIResponse = callGenAIWorker(promptContext, bearerToken);
+        GenAIResponse genAIResponse = callGenAIWorker(promptContext, bearerToken, request.getAiPreference());
         if (genAIResponse == null || genAIResponse.daily_workout() == null) {
             throw new IllegalStateException("Failed to generate workout plan from GenAI service.");
         }
@@ -179,18 +183,35 @@ public class WorkoutPlanService {
             .collect(Collectors.toList());
     }
     
-    private GenAIResponse callGenAIWorker(PromptContext context, String bearerToken) {
+    private GenAIResponse callGenAIWorker(PromptContext context, String bearerToken, String aiPreference) {
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", bearerToken);
         headers.setContentType(MediaType.APPLICATION_JSON);
         HttpEntity<PromptContext> entity = new HttpEntity<>(context, headers);
         
         try {
-            ResponseEntity<GenAIResponse> response = genaiSvcRestTemplate.exchange(
+            // Route to appropriate GenAI worker based on preference
+            RestTemplate targetRestTemplate;
+            String workerType;
+            
+            if ("local".equals(aiPreference)) {
+                targetRestTemplate = genaiLocalSvcRestTemplate;
+                workerType = "local";
+                logger.info("Routing workout generation to LOCAL GenAI worker");
+            } else {
+                targetRestTemplate = genaiSvcRestTemplate;
+                workerType = "cloud";
+                logger.info("Routing workout generation to CLOUD GenAI worker");
+            }
+            
+            ResponseEntity<GenAIResponse> response = targetRestTemplate.exchange(
                 "/generate", HttpMethod.POST, entity, GenAIResponse.class);
+            
+            logger.info("Successfully generated workout using {} GenAI worker", workerType);
             return response.getBody();
         } catch(Exception e) {
-            System.err.println("Error calling GenAI worker: " + e.getMessage());
+            logger.error("Error calling {} GenAI worker: {}", 
+                        ("local".equals(aiPreference) ? "local" : "cloud"), e.getMessage());
             return null;
         }
     }
@@ -257,7 +278,7 @@ public class WorkoutPlanService {
         WeeklyPromptContext promptContext = buildWeeklyPromptContext(user, request, last7DaysWorkouts);
 
         // Step 4: Call the Python genai-service for weekly generation
-        GenAIWeeklyResponse genAIResponse = callGenAIWorkerForWeekly(promptContext, bearerToken);
+        GenAIWeeklyResponse genAIResponse = callGenAIWorkerForWeekly(promptContext, bearerToken, request.getAiPreference());
         if (genAIResponse == null || genAIResponse.workouts() == null || genAIResponse.workouts().isEmpty()) {
             throw new IllegalStateException("Failed to generate weekly workout plan from GenAI service.");
         }
@@ -309,18 +330,35 @@ public class WorkoutPlanService {
         return new WeeklyPromptContext(userProfileMap, user.preferences(), textPrompt, last7DaysExercises);
     }
 
-    private GenAIWeeklyResponse callGenAIWorkerForWeekly(WeeklyPromptContext context, String bearerToken) {
+    private GenAIWeeklyResponse callGenAIWorkerForWeekly(WeeklyPromptContext context, String bearerToken, String aiPreference) {
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", bearerToken);
         headers.setContentType(MediaType.APPLICATION_JSON);
         HttpEntity<WeeklyPromptContext> entity = new HttpEntity<>(context, headers);
         
         try {
-            ResponseEntity<GenAIWeeklyResponse> response = genaiSvcRestTemplate.exchange(
+            // Route to appropriate GenAI worker based on preference
+            RestTemplate targetRestTemplate;
+            String workerType;
+            
+            if ("local".equals(aiPreference)) {
+                targetRestTemplate = genaiLocalSvcRestTemplate;
+                workerType = "local";
+                logger.info("Routing weekly workout generation to LOCAL GenAI worker");
+            } else {
+                targetRestTemplate = genaiSvcRestTemplate;
+                workerType = "cloud";
+                logger.info("Routing weekly workout generation to CLOUD GenAI worker");
+            }
+            
+            ResponseEntity<GenAIWeeklyResponse> response = targetRestTemplate.exchange(
                 "/generate-weekly", HttpMethod.POST, entity, GenAIWeeklyResponse.class);
+            
+            logger.info("Successfully generated weekly plan using {} GenAI worker", workerType);
             return response.getBody();
         } catch(Exception e) {
-            System.err.println("Error calling GenAI worker for weekly plan: " + e.getMessage());
+            logger.error("Error calling {} GenAI worker for weekly plan: {}", 
+                        ("local".equals(aiPreference) ? "local" : "cloud"), e.getMessage());
             return null;
         }
     }

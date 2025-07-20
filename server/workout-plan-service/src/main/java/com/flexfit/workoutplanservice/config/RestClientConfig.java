@@ -17,6 +17,10 @@ public class RestClientConfig {
     @Value("${flexfit.services.genai-service.url}")
     private String genaiServiceUrl;
 
+    // Injects the URL for the local genai-service from application.properties
+    @Value("${flexfit.services.genai-local-service.url}")
+    private String genaiLocalServiceUrl;
+
     /**
      * Creates a RestTemplate bean specifically for calling the user-service.
      * @return A configured RestTemplate instance.
@@ -30,7 +34,7 @@ public class RestClientConfig {
     }
 
     /**
-     * Creates a RestTemplate bean specifically for calling the GenAI service.
+     * Creates a RestTemplate bean specifically for calling the GenAI service (cloud).
      * @return A configured RestTemplate instance.
      */
     @Bean
@@ -38,6 +42,18 @@ public class RestClientConfig {
     public RestTemplate genaiSvcRestTemplate() {
         RestTemplate restTemplate = new RestTemplate();
         restTemplate.setUriTemplateHandler(new RootUriTemplateHandler(genaiServiceUrl));
+        return restTemplate;
+    }
+
+    /**
+     * Creates a RestTemplate bean specifically for calling the Local GenAI service.
+     * @return A configured RestTemplate instance.
+     */
+    @Bean
+    @Qualifier("genaiLocalSvcRestTemplate")
+    public RestTemplate genaiLocalSvcRestTemplate() {
+        RestTemplate restTemplate = new RestTemplate();
+        restTemplate.setUriTemplateHandler(new RootUriTemplateHandler(genaiLocalServiceUrl));
         return restTemplate;
     }
 }

@@ -23,5 +23,8 @@ public class WorkoutPlanGenerationRequest {
     private Integer targetDurationMinutes;
     
     private String textPrompt;
+    
+    // NEW: AI preference to select between cloud and local GenAI workers
+    private String aiPreference = "cloud"; // Default to cloud for backward compatibility
 }
 
