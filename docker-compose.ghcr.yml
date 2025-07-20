@@ -107,7 +107,6 @@ services:
       - flexfit-network
     environment:
       - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://service-registry:8761/eureka
-      - GOOGLE_APPLICATION_CREDENTIALS_JSON=${GOOGLE_APPLICATION_CREDENTIALS_JSON}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8083/api/tts/health"]
       interval: 30s

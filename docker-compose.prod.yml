@@ -136,7 +136,6 @@ services:
       SPRING_PROFILES_ACTIVE: docker,prod
       SERVER_PORT: 8083
       EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://service-registry:8761/eureka
-      GOOGLE_APPLICATION_CREDENTIALS_JSON: ${GOOGLE_APPLICATION_CREDENTIALS_JSON}
     ports:
       - "8083:8083"
     networks:

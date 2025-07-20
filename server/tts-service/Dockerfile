@@ -15,9 +15,6 @@ RUN addgroup -g 1000 appuser && adduser -u 1000 -G appuser -s /bin/sh -D appuser
 # Copy the jar file from build stage
 COPY --from=build /app/target/*.jar app.jar
 
-# Google Cloud credentials will be mounted at runtime
-ENV GOOGLE_APPLICATION_CREDENTIALS_JSON=""
-
 # Change ownership to app user
 RUN chown -R appuser:appuser /app
 USER appuser

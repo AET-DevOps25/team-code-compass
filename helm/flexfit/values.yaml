@@ -184,6 +184,3 @@ postgres:
 
 # Chair API Key for GenAI worker
 chairApiKey: ""  # Set via --set or values file
-
-# Google Cloud Credentials for TTS Service
-googleCredentials: ""  # Set via --set or values file (base64 encoded)

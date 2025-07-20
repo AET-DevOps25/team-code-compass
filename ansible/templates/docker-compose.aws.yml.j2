@@ -66,7 +66,6 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=docker
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-registry:8761/eureka/
-      - GOOGLE_APPLICATION_CREDENTIALS_JSON={{ google_credentials_json }}
     depends_on:
       - service-registry
     restart: unless-stopped

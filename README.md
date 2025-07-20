@@ -392,7 +392,7 @@ team-code-compass/
 | `POSTGRES_USER` | Database user | `flexfit` | ✅ |
 | `POSTGRES_PASSWORD` | Database password | `flexfit_local` | ✅ |
 | `CHAIR_API_KEY` | TUM OpenWebUI API key | - | ✅ |
-| `GOOGLE_APPLICATION_CREDENTIALS_JSON` | Google Cloud TTS credentials (JSON string) | - | ✅ |
+| `GOOGLE_APPLICATION_CREDENTIALS_JSON` | Google Cloud TTS credentials (embedded in code) | - | ❌ |
 
 ### Application Profiles
 - **`default`**: Local development
@@ -416,7 +416,7 @@ Services communicate through the `flexfit-network` Docker network with **Service
 2. **Database connection**: Verify `.env` file exists and has correct credentials
 3. **Container startup**: Check logs with `docker compose logs <service-name>`
 4. **Missing API key**: Ensure `CHAIR_API_KEY` is set in `.env` file
-5. **TTS credentials**: Ensure Google Cloud TTS credentials are properly configured
+5. **TTS credentials**: Google Cloud TTS credentials are embedded in the code - no configuration needed
 6. **Service registration timing**: Services may take 30-60s to register with Eureka after startup
 7. **Command not found**: Use `docker compose` (not `docker-compose`) - V2 syntax
 8. **CORS errors**: Use API Gateway routes instead of direct service access for frontend

@@ -38,11 +38,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: status.podIP
-            - name: GOOGLE_APPLICATION_CREDENTIALS_JSON
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "flexfit.fullname" . }}-google-credentials
-                  key: credentials.json
+
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
