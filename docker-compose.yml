@@ -101,6 +101,7 @@ services:
       - flexfit-network
     environment:
       - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://service-registry:8761/eureka
+      - GOOGLE_APPLICATION_CREDENTIALS_JSON=${GOOGLE_APPLICATION_CREDENTIALS_JSON}
       - GOOGLE_APPLICATION_CREDENTIALS_PATH=/app/google-credentials.json
     volumes:
       - ./server/tts-service/google-credentials.json:/app/google-credentials.json:ro
