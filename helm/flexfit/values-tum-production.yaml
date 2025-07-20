@@ -1,0 +1,67 @@
+# TUM Student Cluster specific values - PRODUCTION ENVIRONMENT
+# Usage: source .env && envsubst < values-tum-production.yaml | helm install flexfit . -f - --namespace team-code-compass-production
+
+# REQUIRED: Set your TUM ID here (from environment variable)
+tumid: "${TUM_ID}"
+
+# Secrets (from environment variables)
+chairApiKey: "${CHAIR_API_KEY}"
+postgres:
+  password: "${POSTGRES_PASSWORD}"
+
+# Use IMAGE_TAG from environment (typically "main" for production, but flexible)
+serviceRegistry:
+  image:
+    tag: "${IMAGE_TAG}"
+
+apiGateway:
+  image:
+    tag: "${IMAGE_TAG}"
+
+userService:
+  image:
+    tag: "${IMAGE_TAG}"
+
+workoutPlanService:
+  image:
+    tag: "${IMAGE_TAG}"
+
+genaiWorker:
+  image:
+    tag: "${IMAGE_TAG}"
+
+genaiWorkerLocal:
+  image:
+    tag: "${IMAGE_TAG}"
+
+frontend:
+  image:
+    tag: "${IMAGE_TAG}"
+
+# Enable monitoring stack for production
+monitoring:
+  prometheus:
+    enabled: true
+  grafana:
+    enabled: true
+    adminPassword: "${GRAFANA_ADMIN_PASSWORD}"
+  alertmanager:
+    enabled: true
+  
+  # Email alerts configuration
+  alerts:
+    email:
+      enabled: true
+      smtpHost: "${SMTP_HOST:-smtp.gmail.com:587}"
+      from: "${ALERT_EMAIL_FROM:-hakanduranyt@gmail.com}"
+      to: "${ALERT_EMAIL_TO:-hakanduranyt@gmail.com}"
+      username: "${ALERT_EMAIL_USERNAME:-hakanduranyt@gmail.com}"
+      password: "${ALERT_EMAIL_PASSWORD:-your_gmail_app_password_here}"
+
+# TUM cluster specific ingress configuration
+ingress:
+  enabled: true
+  className: "nginx"
+  tls: true
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod" 

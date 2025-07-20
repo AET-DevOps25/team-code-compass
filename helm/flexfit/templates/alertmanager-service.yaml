@@ -1,0 +1,19 @@
+{{- if .Values.monitoring.alertmanager.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "flexfit.fullname" . }}-alertmanager
+  labels:
+    {{- include "flexfit.labels" . | nindent 4 }}
+    app.kubernetes.io/component: alertmanager
+spec:
+  type: {{ .Values.monitoring.alertmanager.service.type | default "ClusterIP" }}
+  ports:
+    - port: {{ .Values.monitoring.alertmanager.service.port | default 9093 }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "flexfit.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: alertmanager
+{{- end }} 

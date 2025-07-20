@@ -47,6 +47,8 @@ export interface WorkoutPlanGenerationRequest {
   dayDate: string; // ISO date string (YYYY-MM-DD)
   focusSportType: SportType;
   targetDurationMinutes: number;
+  textPrompt?: string; // Optional custom prompt for workout generation
+  aiPreference?: string; // Optional AI preference: "cloud" or "local"
 }
 
 // Response DTOs
@@ -84,6 +86,7 @@ export interface WorkoutGenerationOptions {
   sportType: SportType;
   targetDurationMinutes: number;
   date?: string; // Optional, defaults to today
+  aiPreference?: string; // Optional, "cloud" or "local", defaults to "cloud"
 }
 
 export interface WorkoutDateRange {

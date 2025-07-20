@@ -1,0 +1,95 @@
+global:
+  # SMTP configuration from environment variables
+  smtp_smarthost: '${SMTP_HOST:-smtp.gmail.com:587}'
+  smtp_from: '${ALERT_EMAIL_FROM:-hakanduranyt@gmail.com}'
+  smtp_auth_username: '${ALERT_EMAIL_USERNAME:-hakanduranyt@gmail.com}'
+  smtp_auth_password: '${ALERT_EMAIL_PASSWORD:-your_app_password_here}'
+  smtp_require_tls: true
+
+route:
+  group_by: ['alertname', 'job']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 12h
+  receiver: 'flexfit-team'
+  routes:
+    # Critical alerts route to immediate notification
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+      group_wait: 10s
+      repeat_interval: 30m
+    # Warning alerts route to standard notification
+    - match:
+        severity: warning
+      receiver: 'warning-alerts'
+      repeat_interval: 6h
+
+receivers:
+  # Critical alerts - immediate notification
+  - name: 'critical-alerts'
+    email_configs:
+      - to: '${ALERT_EMAIL_TO:-hakanduranyt@gmail.com}'
+        subject: '🚨 [CRITICAL] FlexFit Alert: {{ .GroupLabels.alertname }}'
+        html: |
+          <h2 style="color: red;">🚨 CRITICAL ALERT</h2>
+          <table border="1" style="border-collapse: collapse;">
+            <tr><th>Field</th><th>Value</th></tr>
+            {{ range .Alerts }}
+            <tr><td><strong>Alert</strong></td><td>{{ .Annotations.summary }}</td></tr>
+            <tr><td><strong>Description</strong></td><td>{{ .Annotations.description }}</td></tr>
+            <tr><td><strong>Severity</strong></td><td style="color: red;"><strong>{{ .Labels.severity }}</strong></td></tr>
+            <tr><td><strong>Service</strong></td><td>{{ .Labels.job }}</td></tr>
+            <tr><td><strong>Instance</strong></td><td>{{ .Labels.instance }}</td></tr>
+            <tr><td><strong>Started</strong></td><td>{{ .StartsAt.Format "2006-01-02 15:04:05" }}</td></tr>
+            {{ if .EndsAt }}
+            <tr><td><strong>Ended</strong></td><td>{{ .EndsAt.Format "2006-01-02 15:04:05" }}</td></tr>
+            {{ end }}
+            {{ end }}
+          </table>
+          <p><strong>Action Required:</strong> Please investigate immediately!</p>
+
+  # Warning alerts - standard notification
+  - name: 'warning-alerts'
+    email_configs:
+      - to: '${ALERT_EMAIL_TO:-hakanduranyt@gmail.com}'
+        subject: '⚠️ [WARNING] FlexFit Alert: {{ .GroupLabels.alertname }}'
+        html: |
+          <h2 style="color: orange;">⚠️ WARNING ALERT</h2>
+          <table border="1" style="border-collapse: collapse;">
+            <tr><th>Field</th><th>Value</th></tr>
+            {{ range .Alerts }}
+            <tr><td><strong>Alert</strong></td><td>{{ .Annotations.summary }}</td></tr>
+            <tr><td><strong>Description</strong></td><td>{{ .Annotations.description }}</td></tr>
+            <tr><td><strong>Severity</strong></td><td style="color: orange;">{{ .Labels.severity }}</td></tr>
+            <tr><td><strong>Service</strong></td><td>{{ .Labels.job }}</td></tr>
+            <tr><td><strong>Instance</strong></td><td>{{ .Labels.instance }}</td></tr>
+            <tr><td><strong>Started</strong></td><td>{{ .StartsAt.Format "2006-01-02 15:04:05" }}</td></tr>
+            {{ end }}
+          </table>
+          <p><strong>Note:</strong> Please review when convenient.</p>
+
+  # Default team notifications
+  - name: 'flexfit-team'
+    email_configs:
+      - to: '${ALERT_EMAIL_TO:-hakanduranyt@gmail.com}'
+        subject: '[FlexFit] Alert: {{ .GroupLabels.alertname }}'
+        body: |
+          FlexFit System Alert:
+          
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Severity: {{ .Labels.severity }}
+          Service: {{ .Labels.job }}
+          Instance: {{ .Labels.instance }}
+          Started: {{ .StartsAt.Format "2006-01-02 15:04:05" }}
+          {{ end }}
+
+inhibit_rules:
+  # Don't send warning alerts if critical alert for same service is active
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'job', 'instance'] 

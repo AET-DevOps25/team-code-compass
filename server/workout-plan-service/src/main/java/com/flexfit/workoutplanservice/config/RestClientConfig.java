@@ -13,9 +13,12 @@ public class RestClientConfig {
     @Value("${flexfit.services.user-service.url}")
     private String userServiceUrl;
 
-    // Injects the URL for the genai-service from application.properties
-    @Value("${flexfit.services.genai-service.url}")
-    private String genaiServiceUrl;
+    // Injects the URLs for the GenAI services from application.properties
+    @Value("${flexfit.services.genai-service.cloud.url}")
+    private String genaiCloudServiceUrl;
+    
+    @Value("${flexfit.services.genai-service.local.url}")
+    private String genaiLocalServiceUrl;
 
     /**
      * Creates a RestTemplate bean specifically for calling the user-service.
@@ -30,14 +33,39 @@ public class RestClientConfig {
     }
 
     /**
-     * Creates a RestTemplate bean specifically for calling the GenAI service.
+     * Creates a RestTemplate bean specifically for calling the Cloud GenAI service (Claude/OpenAI).
      * @return A configured RestTemplate instance.
      */
     @Bean
+    @Qualifier("genaiCloudRestTemplate")
+    public RestTemplate genaiCloudRestTemplate() {
+        RestTemplate restTemplate = new RestTemplate();
+        restTemplate.setUriTemplateHandler(new RootUriTemplateHandler(genaiCloudServiceUrl));
+        return restTemplate;
+    }
+    
+    /**
+     * Creates a RestTemplate bean specifically for calling the Local GenAI service (GPT4All/Ollama).
+     * @return A configured RestTemplate instance.
+     */
+    @Bean
+    @Qualifier("genaiLocalRestTemplate")
+    public RestTemplate genaiLocalRestTemplate() {
+        RestTemplate restTemplate = new RestTemplate();
+        restTemplate.setUriTemplateHandler(new RootUriTemplateHandler(genaiLocalServiceUrl));
+        return restTemplate;
+    }
+
+    /**
+     * Legacy RestTemplate for backward compatibility.
+     * @deprecated Use genaiCloudRestTemplate or genaiLocalRestTemplate instead.
+     */
+    @Bean
     @Qualifier("genaiSvcRestTemplate")
+    @Deprecated
     public RestTemplate genaiSvcRestTemplate() {
         RestTemplate restTemplate = new RestTemplate();
-        restTemplate.setUriTemplateHandler(new RootUriTemplateHandler(genaiServiceUrl));
+        restTemplate.setUriTemplateHandler(new RootUriTemplateHandler(genaiCloudServiceUrl));
         return restTemplate;
     }
 }

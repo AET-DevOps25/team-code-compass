@@ -1,38 +1,62 @@
-# TUM Student Cluster specific values
-# Usage: helm install flexfit . -f values-tum.yaml --namespace team-code-compass
+# TUM Student Cluster specific values - DEVELOPMENT ENVIRONMENT
+# Usage: source .env && envsubst < values-tum.yaml | helm install flexfit . -f - --namespace team-code-compass-development
 
-# REQUIRED: Set your TUM ID here
-tumid: "ge85zat"
+# REQUIRED: Set your TUM ID here (from environment variable)
+tumid: "${TUM_ID}"
 
-# Secrets
-chairApiKey: "sk-bb7ebe4b651845929b8594afb0aa11b1"
+# Secrets (from environment variables)
+chairApiKey: "${CHAIR_API_KEY}"
 postgres:
-  password: "flexfit_k8s_2025"  # Secure password for Kubernetes deployment
+  password: "${POSTGRES_PASSWORD}"
 
-# Use specific image tags from GHCR
+# Use latest image tags from GHCR (most recent builds for development/staging)
 serviceRegistry:
   image:
-    tag: "feature-ci-cd-ghcr-integration"  # Latest working tag with GHCR
+    tag: "${IMAGE_TAG}"
 
 apiGateway:
   image:
-    tag: "feature-ci-cd-ghcr-integration"
+    tag: "${IMAGE_TAG}"
 
 userService:
   image:
-    tag: "feature-ci-cd-ghcr-integration"
+    tag: "${IMAGE_TAG}"
 
 workoutPlanService:
   image:
-    tag: "feature-ci-cd-ghcr-integration"
+    tag: "${IMAGE_TAG}"
 
 genaiWorker:
   image:
-    tag: "feature-ci-cd-ghcr-integration"
+    tag: "${IMAGE_TAG}"
+
+genaiWorkerLocal:
+  image:
+    tag: "${IMAGE_TAG}"
 
 frontend:
   image:
-    tag: "feature-ci-cd-ghcr-integration"
+    tag: "${IMAGE_TAG}"
+
+# Enable monitoring stack
+monitoring:
+  prometheus:
+    enabled: true
+  grafana:
+    enabled: true
+    adminPassword: "${GRAFANA_ADMIN_PASSWORD:-admin}"
+  alertmanager:
+    enabled: true
+  
+  # Email alerts configuration
+  alerts:
+    email:
+      enabled: true
+      smtpHost: "${SMTP_HOST:-smtp.gmail.com:587}"
+      from: "${ALERT_EMAIL_FROM:-hakanduranyt@gmail.com}"
+      to: "${ALERT_EMAIL_TO:-hakanduranyt@gmail.com}"
+      username: "${ALERT_EMAIL_USERNAME:-hakanduranyt@gmail.com}"
+      password: "${ALERT_EMAIL_PASSWORD:-your_gmail_app_password_here}"
 
 # TUM cluster specific ingress configuration
 ingress:

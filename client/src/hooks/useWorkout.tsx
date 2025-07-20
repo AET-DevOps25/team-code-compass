@@ -9,6 +9,7 @@ import {
   CompletionStatus
 } from '../types/workout';
 import { ApiResponse } from '../types/user';
+import { getTodayLocalDate } from '../utils/dateUtils';
 
 interface UseWorkoutState {
   // Current workout data
@@ -69,7 +70,7 @@ export function useWorkout(): UseWorkoutState {
       if (workout) {
         setCurrentWorkout(workout);
         // If generating for today, update current workout
-        const today = new Date().toISOString().split('T')[0];
+        const today = getTodayLocalDate();
         if (!options.date || options.date === today) {
           setCurrentWorkout(workout);
         }
@@ -126,7 +127,7 @@ export function useWorkout(): UseWorkoutState {
       const workout = handleApiResponse(response);
       
       // If fetching today's workout, update current workout
-      const today = new Date().toISOString().split('T')[0];
+      const today = getTodayLocalDate();
       if (date === today && workout) {
         setCurrentWorkout(workout);
       }

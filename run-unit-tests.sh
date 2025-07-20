@@ -105,6 +105,7 @@ else
     FAILED_SERVICES+=("Service Registry")
 fi
 
+<<<<<<< HEAD
 # 5. TTS Service Unit Tests
 echo -e "\n${BLUE}5. TTS Service Unit Tests${NC}"
 TOTAL_TESTS=$((TOTAL_TESTS + 1))
@@ -120,29 +121,46 @@ fi
 
 # 6. GenAI Worker Unit Tests
 echo -e "\n${BLUE}6. GenAI Worker Unit Tests${NC}"
+=======
+# 5. GenAI Cloud Worker Unit Tests
+echo -e "\n${BLUE}5. GenAI Cloud Worker Unit Tests${NC}"
+>>>>>>> 8ee4364d68a838d9dfdbb262658698d1e9f4ec0b
 TOTAL_TESTS=$((TOTAL_TESTS + 1))
 
-if run_test_suite "GenAI Worker" \
+if run_test_suite "GenAI Cloud Worker" \
     "genai" \
     "python3 -m pytest test_workout_worker.py -v --tb=short" \
-    "GenAI Worker (FastAPI + Pytest)"; then
+    "GenAI Cloud Worker (FastAPI + Pytest)"; then
     PASSED_TESTS=$((PASSED_TESTS + 1))
 else
-    FAILED_SERVICES+=("GenAI Worker")
+    FAILED_SERVICES+=("GenAI Cloud Worker")
 fi
 
-# 6. Frontend Unit Tests (if Next.js tests exist)
-if [ -f "client/package.json" ] && grep -q '"test"' client/package.json; then
-    echo -e "\n${BLUE}6. Frontend Unit Tests${NC}"
+# 6. GenAI Local Worker Unit Tests
+echo -e "\n${BLUE}6. GenAI Local Worker Unit Tests${NC}"
+TOTAL_TESTS=$((TOTAL_TESTS + 1))
+
+if run_test_suite "GenAI Local Worker" \
+    "genai" \
+    "python3 -m pytest test_workout_worker_local.py -v --tb=short" \
+    "GenAI Local Worker (FastAPI + Pytest + Mocked LLMs)"; then
+    PASSED_TESTS=$((PASSED_TESTS + 1))
+else
+    FAILED_SERVICES+=("GenAI Local Worker")
+fi
+
+# 7. Frontend Integration Tests (Node.js based)
+if [ -f "client/tests/ai-preference-integration.test.js" ]; then
+    echo -e "\n${BLUE}7. Frontend Integration Tests${NC}"
     TOTAL_TESTS=$((TOTAL_TESTS + 1))
     
-    if run_test_suite "Frontend" \
+    if run_test_suite "Frontend Integration" \
         "client" \
-        "npm test -- --watchAll=false --coverage=false" \
-        "Frontend (Next.js + Jest)"; then
+        "node tests/ai-preference-integration.test.js" \
+        "Frontend AI Preference Integration (Node.js)"; then
         PASSED_TESTS=$((PASSED_TESTS + 1))
     else
-        FAILED_SERVICES+=("Frontend")
+        FAILED_SERVICES+=("Frontend Integration")
     fi
 fi
 
@@ -165,5 +183,7 @@ else
     echo -e "  ${GREEN}cd server/user-service && ./mvnw test${NC}"
     echo -e "  ${GREEN}cd server/workout-plan-service && ./mvnw test${NC}"
     echo -e "  ${GREEN}cd genai && python3 -m pytest test_workout_worker.py -v${NC}"
+    echo -e "  ${GREEN}cd genai && python3 -m pytest test_workout_worker_local.py -v${NC}"
+    echo -e "  ${GREEN}cd client && node tests/ai-preference-integration.test.js${NC}"
     exit 1
 fi 

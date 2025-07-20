@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "flexfit.fullname" . }}-genai-worker-local
+  labels:
+    {{- include "flexfit.labels" . | nindent 4 }}
+    app.kubernetes.io/component: genai-worker-local
+spec:
+  replicas: {{ .Values.genaiWorkerLocal.replicaCount | default 1 }}
+  selector:
+    matchLabels:
+      {{- include "flexfit.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: genai-worker-local
+  template:
+    metadata:
+      labels:
+        {{- include "flexfit.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: genai-worker-local
+    spec:
+      containers:
+      - name: genai-worker-local
+        image: "{{ .Values.genaiWorkerLocal.image.repository }}:{{ .Values.genaiWorkerLocal.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.genaiWorkerLocal.image.pullPolicy | default "IfNotPresent" }}
+        ports:
+        - name: http
+          containerPort: 8084
+          protocol: TCP
+        env:
+        - name: LOCAL_MODEL_TYPE
+          value: {{ .Values.genaiWorkerLocal.localModelType | default "mock" | quote }}
+        - name: OLLAMA_BASE_URL
+          value: {{ .Values.genaiWorkerLocal.ollamaBaseUrl | default "http://localhost:11434" | quote }}
+        - name: OLLAMA_MODEL
+          value: {{ .Values.genaiWorkerLocal.ollamaModel | default "llama2" | quote }}
+        - name: GPT4ALL_MODEL_PATH
+          value: {{ .Values.genaiWorkerLocal.gpt4allModelPath | default "/app/models/ggml-gpt4all-j-v1.3-groovy.bin" | quote }}
+        - name: MOCK_MODE
+          value: {{ .Values.genaiWorkerLocal.mockMode | default "true" | quote }}
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+          {{- toYaml (.Values.genaiWorkerLocal.resources | default .Values.resources) | nindent 10 }} 

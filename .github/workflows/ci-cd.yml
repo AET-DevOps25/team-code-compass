@@ -1,10 +1,19 @@
 name: 🚀 FlexFit CI/CD Pipeline
 
+# 🎯 CI/CD Strategy:
+# ┌─────────────────┬──────────────┬────────────────┬──────────────┐
+# │ Branch Type     │ Unit Tests   │ Integration    │ Build & Push │
+# ├─────────────────┼──────────────┼────────────────┼──────────────┤
+# │ Feature/*       │ 🔧 Manual    │ 🔧 Manual      │ 🔧 Manual    │
+# │ Pull Requests   │ ✅ Always    │ ✅ Always      │ ❌ Skip      │
+# │ Main/Dev/Prod   │ ✅ Always    │ ✅ Always      │ ✅ Always    │
+# └─────────────────┴──────────────┴────────────────┴──────────────┘
+
 on:
   push:
-    branches: [ main, development, 'feature/*' ]
+    branches: [ main, development, production ]
   pull_request:
-    branches: [ main, development ]
+    branches: [ main, development, production ]
   workflow_dispatch:
     inputs:
       test_level:
@@ -15,7 +24,6 @@ on:
         options:
           - unit-only
           - integration-only
-          - system-only
           - quick
           - full
 
@@ -31,11 +39,12 @@ jobs:
     outputs:
       should_run_unit: ${{ steps.decide.outputs.should_run_unit }}
       should_run_integration: ${{ steps.decide.outputs.should_run_integration }}
-      should_run_system: ${{ steps.decide.outputs.should_run_system }}
       target_branch: ${{ github.base_ref || github.ref_name }}
       is_pr: ${{ github.event_name == 'pull_request' }}
       is_main: ${{ github.ref == 'refs/heads/main' }}
       is_development: ${{ github.ref == 'refs/heads/development' }}
+      is_production: ${{ github.ref == 'refs/heads/production' }}
+      is_stable_branch: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development' || github.ref == 'refs/heads/production' }}
     steps:
       - name: 📋 Pipeline Information
         run: |
@@ -46,61 +55,46 @@ jobs:
           echo "Actor: ${{ github.actor }}"
           echo ""
           if [[ "${{ github.ref }}" == refs/heads/feature/* ]]; then
-            echo "🌿 Feature Branch - Running unit + integration tests only"
+            echo "🌿 Feature Branch - Unit Tests ✅ | Integration Tests ✅ | Build & Push ❌"
           elif [ "${{ github.event_name }}" == "pull_request" ]; then
-            echo "🔄 Pull Request - Running validation tests"
+            echo "🔄 Pull Request - Unit Tests ✅ | Integration Tests ✅ | Build & Push ❌"
+          elif [[ "${{ github.ref }}" == refs/heads/main || "${{ github.ref }}" == refs/heads/development || "${{ github.ref }}" == refs/heads/production ]]; then
+            echo "🎯 Stable Branch (${{ github.ref_name }}) - Unit Tests ✅ | Integration Tests ✅ | Build & Push ✅"
           else
-            echo "🎯 Main/Development - Running full pipeline"
+            echo "🔍 Other Branch - Unit Tests ✅ | Integration Tests ✅ | Build & Push ❌"
           fi
 
       - name: 🎯 Decide what to run
         id: decide
         run: |
-          # Default: run everything
+          # Default: run unit and integration tests
           UNIT="true"
           INTEGRATION="true"
-          SYSTEM="true"
           
           # Manual trigger - respect user choice
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             case "${{ github.event.inputs.test_level }}" in
               "unit-only")
-                UNIT="true"; INTEGRATION="false"; SYSTEM="false"
+                UNIT="true"; INTEGRATION="false"
                 ;;
               "integration-only")
-                UNIT="false"; INTEGRATION="true"; SYSTEM="false"
-                ;;
-              "system-only")
-                UNIT="false"; INTEGRATION="false"; SYSTEM="true"
+                UNIT="false"; INTEGRATION="true"
                 ;;
               "quick")
-                UNIT="true"; INTEGRATION="true"; SYSTEM="false"
+                UNIT="true"; INTEGRATION="true"
                 ;;
               *)
-                UNIT="true"; INTEGRATION="true"; SYSTEM="true"
+                UNIT="true"; INTEGRATION="true"
                 ;;
             esac
           fi
           
-          # PR - run unit + integration only
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
-            SYSTEM="false"
-          fi
-          
-          # Feature branches - run unit + integration only (no system tests)
-          if [[ "${{ github.ref }}" == refs/heads/feature/* ]]; then
-            SYSTEM="false"
-            echo "🌿 Feature branch detected - running unit + integration tests only"
-          fi
-          
           echo "should_run_unit=$UNIT" >> $GITHUB_OUTPUT
           echo "should_run_integration=$INTEGRATION" >> $GITHUB_OUTPUT
-          echo "should_run_system=$SYSTEM" >> $GITHUB_OUTPUT
           
           echo "🎯 Pipeline Plan:"
           echo "   Unit Tests: $UNIT"
           echo "   Integration Tests: $INTEGRATION"
-          echo "   System Tests: $SYSTEM"
 
   # Job 2: Unit Tests
   unit-tests:
@@ -126,23 +120,37 @@ jobs:
       - name: 📦 Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest requests fastapi uvicorn
+          pip install pytest requests fastapi uvicorn httpx
 
       - name: 🧪 Run Java Unit Tests
         run: |
           echo "🧪 Running Java unit tests..."
+<<<<<<< HEAD
           cd server/user-service && ./mvnw test -q
           cd ../workout-plan-service && ./mvnw test -q
           cd ../tts-service && ./mvnw test -q
+=======
+          cd server/user-service && chmod +x ./mvnw && ./mvnw test -Dspring.profiles.active=test
+          cd ../workout-plan-service && chmod +x ./mvnw && ./mvnw test -Dspring.profiles.active=test
+>>>>>>> 8ee4364d68a838d9dfdbb262658698d1e9f4ec0b
           echo "✅ Java unit tests completed"
 
-      - name: 🧪 Run Python Unit Tests (SKIPPED)
+      - name: 🧪 Run Python Unit Tests
         continue-on-error: true
         env:
           CHAIR_API_KEY: ${{ secrets.CHAIR_API_KEY }}
         run: |
-          echo "⚠️ Skipping Python unit tests as requested..."
-          echo "✅ Python unit tests skipped"
+          echo "🧪 Running Python unit tests..."
+          cd genai && python -m pytest test_workout_worker.py -v
+          python -m pytest test_workout_worker_local.py -v
+          echo "✅ Python unit tests completed"
+
+      - name: 🌐 Run Client Tests
+        run: |
+          echo "🌐 Running client tests..."
+          cd client && node tests/core-workflows.test.js
+          node tests/ai-preference-integration.test.js
+          echo "✅ Client tests completed"
 
       - name: 📊 Unit Test Summary
         run: |
@@ -188,101 +196,94 @@ jobs:
           python -m pip install --upgrade pip
           pip install pytest requests fastapi uvicorn
 
-      - name: 🐳 Start services (SKIPPED)
+      - name: 🐳 Start services
         env:
           CHAIR_API_KEY: ${{ secrets.CHAIR_API_KEY }}
         run: |
-          echo "⚠️ Skipping Docker compose startup due to port conflicts..."
-          echo "✅ Service startup skipped"
+          echo "🐳 Starting services for integration tests..."
+          chmod +x run-integration-tests.sh
+          ./run-integration-tests.sh --start-only
+          echo "✅ Services started"
 
-      - name: 🏥 Health checks (SKIPPED)
+      - name: 🔗 Run Integration Tests
+        env:
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/flexfit_test
+          SPRING_DATASOURCE_USERNAME: postgres
+          SPRING_DATASOURCE_PASSWORD: postgres
+          SPRING_PROFILES_ACTIVE: test
         run: |
-          echo "⚠️ Skipping health checks as services not started..."
-          echo "✅ Health checks skipped"
-
-      - name: 🔗 Run Integration Tests (SKIPPED)
-        run: |
-          echo "⚠️ Skipping integration tests as requested..."
-          echo "✅ Integration tests skipped"
+          echo "🔗 Running integration tests..."
+          echo "Starting Java services directly on Ubuntu (using CI PostgreSQL)..."
+          
+          # Start Service Registry
+          echo "Starting Service Registry..."
+          cd server/service-registry
+          ./mvnw spring-boot:run -Dspring-boot.run.arguments="--server.port=8761" &
+          SERVICE_REGISTRY_PID=$!
+          cd ../..
+          
+          # Wait for Service Registry
+          sleep 15
+          echo "Waiting for Service Registry to be ready..."
+          timeout 60 bash -c 'while ! curl -s http://localhost:8761/actuator/health; do sleep 2; done'
+          
+          # Start User Service
+          echo "Starting User Service..."
+          cd server/user-service
+          ./mvnw spring-boot:run -Dspring-boot.run.arguments="--server.port=8081 --eureka.client.service-url.defaultZone=http://localhost:8761/eureka" &
+          USER_SERVICE_PID=$!
+          cd ../..
+          
+          # Start Workout Plan Service  
+          echo "Starting Workout Plan Service..."
+          cd server/workout-plan-service
+          ./mvnw spring-boot:run -Dspring-boot.run.arguments="--server.port=8082 --eureka.client.service-url.defaultZone=http://localhost:8761/eureka" &
+          WORKOUT_SERVICE_PID=$!
+          cd ../..
+          
+          # Start API Gateway
+          echo "Starting API Gateway..."
+          cd server/api-gateway
+          ./mvnw spring-boot:run -Dspring-boot.run.arguments="--server.port=8080 --eureka.client.service-url.defaultZone=http://localhost:8761/eureka" &
+          API_GATEWAY_PID=$!
+          cd ../..
+          
+          # Wait for all services to be ready
+          echo "Waiting for services to be ready..."
+          sleep 30
+          
+          # Check service health
+          echo "Checking service health..."
+          curl -f http://localhost:8761/actuator/health || echo "Service Registry not ready"
+          curl -f http://localhost:8081/actuator/health || echo "User Service not ready"  
+          curl -f http://localhost:8082/actuator/health || echo "Workout Service not ready"
+          curl -f http://localhost:8080/actuator/health || echo "API Gateway not ready"
+          
+          # Run integration tests
+          echo "Running integration tests..."
+          ./run-integration-tests.sh --test-only
+          
+          # Cleanup processes
+          echo "Stopping services..."
+          kill $SERVICE_REGISTRY_PID $USER_SERVICE_PID $WORKOUT_SERVICE_PID $API_GATEWAY_PID 2>/dev/null || true
+          
+          echo "✅ Integration tests completed"
 
       - name: 🧹 Cleanup
         if: always()
         run: |
-          docker compose down -v
+          echo "🧹 Cleaning up integration test processes..."
+          # Kill any remaining Java processes
+          pkill -f "spring-boot:run" || true
+          # Clean up any Docker containers (if any were started)
+          docker ps -q | xargs -r docker stop || true
 
-  # Job 4: System Tests
-  system-tests:
-    name: 🌐 System Tests
-    runs-on: ubuntu-latest
-    needs: [setup, integration-tests]
-    if: needs.setup.outputs.should_run_system == 'true'
-    services:
-      postgres:
-        image: postgres:13
-        env:
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: flexfit_test
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-
-    steps:
-      - name: 📥 Checkout code
-        uses: actions/checkout@v4
-
-      - name: ☕ Set up Java
-        uses: actions/setup-java@v3
-        with:
-          java-version: ${{ env.JAVA_VERSION }}
-          distribution: 'temurin'
-
-      - name: 🐍 Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: 📦 Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install pytest requests fastapi uvicorn
-
-      - name: 🐳 Start full system (SKIPPED)
-        env:
-          CHAIR_API_KEY: ${{ secrets.CHAIR_API_KEY }}
-        run: |
-          echo "⚠️ Skipping Docker compose startup due to port conflicts..."
-          echo "✅ System startup skipped"
-
-      - name: 🏥 System health checks (SKIPPED)
-        run: |
-          echo "⚠️ Skipping health checks as system not started..."
-          echo "✅ Health checks skipped"
-
-      - name: 🌐 Run System Tests (SKIPPED)
-        run: |
-          echo "⚠️ Skipping system tests as requested..."
-          echo "✅ System tests skipped"
-
-      - name: 💪 Run Workout Integration Tests (SKIPPED)
-        run: |
-          echo "⚠️ Skipping workout integration tests as requested..."
-          echo "✅ Workout integration tests skipped"
-
-      - name: 🧹 Cleanup
-        if: always()
-        run: |
-          docker compose down -v
-
-  # Job 5: Build & Push to GHCR
+  # Job 4: Build & Push to GHCR (parallel with integration tests - temporary)
   build-and-push-ghcr:
     name: 🐳 Build & Push to GHCR
     runs-on: ubuntu-latest
     needs: [setup, unit-tests]
-    if: always() && (needs.setup.outputs.is_main == 'true' || needs.setup.outputs.is_development == 'true' || contains(github.ref, 'feature/'))
+    if: always() && needs.unit-tests.result == 'success' && (needs.setup.outputs.is_stable_branch == 'true' || github.event_name == 'workflow_dispatch')
     permissions:
       contents: read
       packages: write
@@ -301,6 +302,9 @@ jobs:
             context: ./server/tts-service
           - name: genai-worker
             context: ./genai
+          - name: genai-worker-local
+            context: ./genai
+            dockerfile: ./Dockerfile.local
           - name: frontend
             context: ./client
     steps:
@@ -320,66 +324,47 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository }}/${{ matrix.service.name }}
           tags: |
-            type=ref,event=branch
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/development' }}
+            type=raw,value=main,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=production,enable=${{ github.ref == 'refs/heads/production' }}
+            type=ref,event=branch,enable=${{ !contains(fromJSON('["refs/heads/development", "refs/heads/main", "refs/heads/production"]'), github.ref) }}
             type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable={{is_default_branch}}
 
       - name: 🐳 Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: ${{ matrix.service.context }}
+          file: ${{ matrix.service.context }}/${{ matrix.service.dockerfile || 'Dockerfile' }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             NEXT_PUBLIC_API_URL=http://localhost:8080
 
-  # Job 6: Build & Package (only for main branch)
-  build-package:
-    name: 🏗️ Build & Package
+  # Job 5: Deploy to Kubernetes
+  deploy-to-kubernetes:
+    name: 🚀 Deploy to Kubernetes
     runs-on: ubuntu-latest
-    needs: [setup, unit-tests, integration-tests, system-tests]
-    if: always() && needs.setup.outputs.is_main == 'true' && needs.unit-tests.result == 'success' && (needs.integration-tests.result == 'success' || needs.integration-tests.result == 'skipped') && (needs.system-tests.result == 'success' || needs.system-tests.result == 'skipped')
+    needs: [setup, unit-tests, integration-tests, build-and-push-ghcr]
+    if: always() && needs.unit-tests.result == 'success' && needs.build-and-push-ghcr.result == 'success' && (needs.setup.outputs.is_stable_branch == 'true' || github.event_name == 'workflow_dispatch')
+    environment:
+      name: ${{ needs.setup.outputs.is_development == 'true' && 'development' || 'production' }}
+      url: ${{ needs.setup.outputs.is_development == 'true' && 'https://flexfit-dev.local' || 'https://flexfit-prod.local' }}
     steps:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
 
-      - name: ☕ Set up Java
-        uses: actions/setup-java@v3
+      - name: 🔧 Set up kubectl
+        uses: azure/setup-kubectl@v3
         with:
-          java-version: ${{ env.JAVA_VERSION }}
-          distribution: 'temurin'
+          version: 'latest'
 
-      - name: 🏗️ Build all services
-        run: |
-          echo "🏗️ Building all services..."
-          cd server/user-service && ./mvnw clean package -DskipTests
-          cd ../workout-plan-service && ./mvnw clean package -DskipTests
-          cd ../api-gateway && ./mvnw clean package -DskipTests
-          cd ../service-registry && ./mvnw clean package -DskipTests
-          echo "✅ All services built"
-
-      - name: 🐳 Build Docker images
-        run: |
-          echo "🐳 Building Docker images..."
-          docker compose build
-          echo "✅ Docker images built"
-
-      - name: 📦 Create artifacts
-        run: |
-          echo "📦 Creating deployment artifacts..."
-          mkdir -p artifacts
-          cp -r server/*/target/*.jar artifacts/
-          cp docker-compose.yml artifacts/
-          tar -czf flexfit-deployment-${{ github.run_number }}.tar.gz artifacts/
-          echo "✅ Artifacts created"
-
-      - name: 📊 Upload artifacts
-        uses: actions/upload-artifact@v4
+      - name: 🔧 Set up Helm
+        uses: azure/setup-helm@v3
         with:
-          name: deployment-artifacts-${{ github.run_number }}
-          path: flexfit-deployment-*.tar.gz
+          version: 'latest'
 
+<<<<<<< HEAD
   # Job 7: Deploy to Kubernetes (only for main branch)
   deploy-k8s:
     name: 🚀 Deploy to Kubernetes
@@ -441,6 +426,128 @@ jobs:
     name: 📊 Pipeline Summary
     runs-on: ubuntu-latest
     needs: [setup, unit-tests, integration-tests, system-tests, build-package, build-and-push-ghcr, deploy-k8s]
+=======
+      - name: 🔑 Configure Kubernetes context
+        run: |
+          echo "🔧 Setting up TUM Kubernetes cluster access..."
+          
+          # Create .kube directory
+          mkdir -p ~/.kube
+          
+          # Write kubeconfig from GitHub secret
+          echo "${{ secrets.TUM_KUBECONFIG }}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+          
+          # Verify connection
+          kubectl config current-context
+          kubectl version --client
+          
+          echo "✅ Connected to TUM Kubernetes cluster"
+
+      - name: 🌍 Set deployment environment
+        id: env
+        run: |
+          if [[ "${{ needs.setup.outputs.is_development }}" == "true" ]]; then
+            echo "namespace=team-code-compass-development" >> $GITHUB_OUTPUT
+            echo "values_file=values-tum.yaml" >> $GITHUB_OUTPUT
+            echo "environment=development" >> $GITHUB_OUTPUT
+          elif [[ "${{ needs.setup.outputs.is_main }}" == "true" ]]; then
+            echo "namespace=team-code-compass-production" >> $GITHUB_OUTPUT
+            echo "values_file=values-tum-production.yaml" >> $GITHUB_OUTPUT
+            echo "environment=production" >> $GITHUB_OUTPUT
+          else
+            echo "namespace=team-code-compass-development" >> $GITHUB_OUTPUT
+            echo "values_file=values-tum.yaml" >> $GITHUB_OUTPUT
+            echo "environment=development" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 🔄 Wait for image propagation
+        run: |
+          echo "⏳ Waiting 30 seconds for GHCR images to propagate..."
+          sleep 30
+
+      - name: 🚀 Deploy to Kubernetes using Helm
+        run: |
+          echo "🎯 Deploying to ${{ steps.env.outputs.environment }} environment"
+          echo "📦 Namespace: ${{ steps.env.outputs.namespace }}"
+          echo "📁 Values file: ${{ steps.env.outputs.values_file }}"
+          
+          # Set required environment variables for deployment
+          export TUM_ID="${{ secrets.TUM_ID }}"
+          export CHAIR_API_KEY="${{ secrets.CHAIR_API_KEY }}"
+          export POSTGRES_PASSWORD="${{ secrets.POSTGRES_PASSWORD }}"
+          export GRAFANA_ADMIN_PASSWORD="${{ secrets.GRAFANA_ADMIN_PASSWORD }}"
+          
+          # Email alerts (optional)
+          export ALERT_EMAIL_FROM="${{ secrets.ALERT_EMAIL_FROM || 'hakanduranyt@gmail.com' }}"
+          export ALERT_EMAIL_TO="${{ secrets.ALERT_EMAIL_TO || 'hakanduranyt@gmail.com' }}"
+          export ALERT_EMAIL_USERNAME="${{ secrets.ALERT_EMAIL_USERNAME || 'hakanduranyt@gmail.com' }}"
+          export ALERT_EMAIL_PASSWORD="${{ secrets.ALERT_EMAIL_PASSWORD || 'your_gmail_app_password_here' }}"
+          export SMTP_HOST="${{ secrets.SMTP_HOST || 'smtp.gmail.com:587' }}"
+          
+          # Set IMAGE_TAG based on branch
+          if [[ "${{ needs.setup.outputs.is_main }}" == "true" ]]; then
+            export IMAGE_TAG="main"
+            echo "🏷️ Using IMAGE_TAG=main for production deployment"
+          else
+            export IMAGE_TAG="latest"
+            echo "🏷️ Using IMAGE_TAG=latest for development deployment"
+          fi
+          
+          # Validate required secrets
+          if [[ -z "$TUM_ID" || -z "$CHAIR_API_KEY" || -z "$POSTGRES_PASSWORD" || -z "$GRAFANA_ADMIN_PASSWORD" ]]; then
+            echo "❌ Missing required secrets. Please configure:"
+            echo "  - TUM_ID"
+            echo "  - CHAIR_API_KEY" 
+            echo "  - POSTGRES_PASSWORD"
+            echo "  - GRAFANA_ADMIN_PASSWORD"
+            echo ""
+            echo "📋 Optional TUM Kubernetes secrets:"
+            echo "  - TUM_KUBECONFIG (base64 encoded kubeconfig)"
+            echo "  - TUM_NAMESPACE (e.g., ge85zat-devops25)"  
+            echo "  - TUM_INGRESS_HOST (e.g., ge85zat-devops25.student.k8s.aet.cit.tum.de)"
+            exit 1
+          fi
+          
+          # Deploy using envsubst and helm
+          cd helm/flexfit
+          envsubst < ${{ steps.env.outputs.values_file }} | \
+          helm upgrade --install flexfit . \
+            --namespace ${{ steps.env.outputs.namespace }} \
+            --create-namespace \
+            --wait \
+            --timeout=10m \
+            -f -
+
+      - name: ✅ Verify deployment
+        run: |
+          echo "🔍 Verifying deployment in ${{ steps.env.outputs.namespace }}"
+          kubectl get pods -n ${{ steps.env.outputs.namespace }}
+          kubectl get services -n ${{ steps.env.outputs.namespace }}
+          
+          echo "🌐 Checking service health..."
+          kubectl wait --for=condition=ready pod -l app=frontend -n ${{ steps.env.outputs.namespace }} --timeout=300s || true
+          kubectl wait --for=condition=ready pod -l app=api-gateway -n ${{ steps.env.outputs.namespace }} --timeout=300s || true
+
+      - name: 📊 Deployment summary
+        run: |
+          echo "## 🚀 Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment**: ${{ steps.env.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Namespace**: ${{ steps.env.outputs.namespace }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Deployed Services:" >> $GITHUB_STEP_SUMMARY
+          kubectl get pods -n ${{ steps.env.outputs.namespace }} --no-headers | while read line; do
+            echo "- $line" >> $GITHUB_STEP_SUMMARY
+          done
+
+  # Job 6: Pipeline Summary
+  summary:
+    name: 📊 Pipeline Summary
+    runs-on: ubuntu-latest
+    needs: [setup, unit-tests, integration-tests, build-and-push-ghcr, deploy-to-kubernetes]
+>>>>>>> 8ee4364d68a838d9dfdbb262658698d1e9f4ec0b
     if: always()
     steps:
       - name: 📊 Pipeline Results
@@ -454,9 +561,8 @@ jobs:
           echo "Test Results:"
           echo "  🧪 Unit Tests: ${{ needs.unit-tests.result || 'skipped' }}"
           echo "  🔗 Integration Tests: ${{ needs.integration-tests.result || 'skipped' }}"
-          echo "  🌐 System Tests: ${{ needs.system-tests.result || 'skipped' }}"
-          echo "  🏗️ Build & Package: ${{ needs.build-package.result || 'skipped' }}"
           echo "  🐳 GHCR Push: ${{ needs.build-and-push-ghcr.result || 'skipped' }}"
+<<<<<<< HEAD
           echo "  🚀 Kubernetes Deploy: ${{ needs.deploy-k8s.result || 'skipped' }}"
           echo ""
           
@@ -465,3 +571,7 @@ jobs:
           else
             echo "❌ Pipeline failed - check logs for details"
           fi 
+=======
+          echo "  🚀 Kubernetes Deploy: ${{ needs.deploy-to-kubernetes.result || 'skipped' }}"
+          echo "" 
+>>>>>>> 8ee4364d68a838d9dfdbb262658698d1e9f4ec0b

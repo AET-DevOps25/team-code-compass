@@ -19,7 +19,23 @@ public class OpenApiConfig {
         return new OpenAPI()
                 .info(new Info()
                         .title("FlexFit Workout Plan Service API")
-                        .description("Workout planning and exercise management service for the FlexFit fitness application")
+                        .description("""
+                            AI-powered workout planning and exercise management service for the FlexFit fitness application.
+                            
+                            ## Features
+                            - **Daily Workout Generation**: Create personalized daily workouts using AI
+                            - **Weekly Plan Generation**: Generate comprehensive 7-day workout plans
+                            - **Dual AI Support**: Choose between cloud AI (Claude/OpenAI) or local AI (GPT4All/Ollama)
+                            - **User Preference Integration**: Workouts adapted to user preferences, equipment, and fitness level
+                            - **Progress Tracking**: Store and retrieve workout completion data
+                            
+                            ## AI Preference Options
+                            - **cloud**: Uses cloud-based AI models (Claude, OpenAI) for advanced reasoning
+                            - **local**: Uses local AI models for privacy-preserving workout generation
+                            
+                            ## Authentication
+                            All endpoints (except health checks) require a valid JWT token in the Authorization header.
+                            """)
                         .version("v1.0.0")
                         .contact(new Contact()
                                 .name("FlexFit Development Team")
@@ -43,6 +59,7 @@ public class OpenApiConfig {
                                 new SecurityScheme()
                                         .type(SecurityScheme.Type.HTTP)
                                         .scheme("bearer")
-                                        .bearerFormat("JWT")));
+                                        .bearerFormat("JWT")
+                                        .description("JWT token for API authentication. Format: Bearer {token}")));
     }
 }

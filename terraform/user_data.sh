@@ -3,11 +3,15 @@ set -e
 
 # Update system
 apt-get update
-apt-get install -y docker.io docker-compose git
+apt-get install -y docker.io git
 
 # Start Docker
 systemctl start docker
 systemctl enable docker
+
+# Install Docker Compose V2
+curl -L "https://github.com/docker/compose/releases/download/v2.29.7/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+chmod +x /usr/local/bin/docker-compose
 
 # Clone repository
 cd /opt
@@ -40,10 +44,10 @@ find . -name "*.yml" -o -name "*.yaml" -o -name "*.properties" | xargs sed -i "s
 
 # Pull images with specific tag
 export IMAGE_TAG=${image_tag}
-docker-compose pull
+docker compose pull
 
 # Start services
-docker-compose up -d
+docker compose up -d
 
 # Setup nginx as reverse proxy
 apt-get install -y nginx
