@@ -211,10 +211,13 @@ services:
     volumes:
       - ./monitoring/alertmanager:/etc/alertmanager
       - alertmanager_data:/alertmanager
-    command:
-      - '--config.file=/etc/alertmanager/alertmanager.yml'
-      - '--storage.path=/alertmanager'
-      - '--web.external-url=http://localhost:9093'
+    environment:
+      - SMTP_HOST=${SMTP_HOST:-smtp.gmail.com:587}
+      - ALERT_EMAIL_FROM=${ALERT_EMAIL_FROM:-hakanduranyt@gmail.com}
+      - ALERT_EMAIL_TO=${ALERT_EMAIL_TO:-hakanduranyt@gmail.com}
+      - ALERT_EMAIL_USERNAME=${ALERT_EMAIL_USERNAME:-hakanduranyt@gmail.com}
+      - ALERT_EMAIL_PASSWORD=${ALERT_EMAIL_PASSWORD:-your_gmail_app_password_here}
+    entrypoint: ["/etc/alertmanager/start-alertmanager.sh"]
     networks:
       - flexfit-network
     depends_on:

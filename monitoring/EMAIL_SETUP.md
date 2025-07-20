@@ -1,70 +1,197 @@
 # Email Alerts Setup Guide
 
-## 🚀 Quick Setup for Testing
+## 🤔 **Which Email Should I Use?**
 
-### 1. Gmail App Password Setup
+You have **3 options** for setting up email alerts:
 
-Since the alerts are configured to send from `hakanduranyt@gmail.com`, you need to set up a Gmail App Password:
+### **Option 1: Your Personal Gmail (Recommended for testing) 📧**
+- **FROM**: Your personal Gmail sends the alerts
+- **TO**: Your personal Gmail receives the alerts
+- **Why**: Easy to test, you control everything
+
+### **Option 2: Current Setup (Already configured) ✅**
+- **FROM**: `hakanduranyt@gmail.com` sends alerts
+- **TO**: `hakanduranyt@gmail.com` receives alerts  
+- **Why**: Works immediately for testing
+
+### **Option 3: Dedicated FlexFit Gmail (Best for production) 🏢**
+- **FROM**: `flexfit.alerts@gmail.com` sends alerts
+- **TO**: Your personal email receives alerts
+- **Why**: Professional, separate from personal accounts
+
+## 🚀 **Quick Setup Steps**
+
+### 1. **Choose Your Email Setup**
+
+**For YOUR Gmail (Option 1):**
+```bash
+# Copy env.example to .env
+cp env.example .env
+
+# Edit .env with your email:
+ALERT_EMAIL_FROM=your.email@gmail.com
+ALERT_EMAIL_TO=your.email@gmail.com  
+ALERT_EMAIL_USERNAME=your.email@gmail.com
+ALERT_EMAIL_PASSWORD=your_gmail_app_password_here
+```
+
+**For Current Setup (Option 2):**
+```bash
+# Just copy the example - it's already configured!
+cp env.example .env
+# You'll still need to set the App Password below
+```
+
+### 2. **Get Gmail App Password**
 
 1. **Enable 2-Factor Authentication**
-   - Go to Google Account → Security
+   - Go to [Google Account Security](https://myaccount.google.com/security)
    - Turn on 2-Step Verification
 
 2. **Generate App Password**
    - Google Account → Security → App passwords
    - Select "Mail" and generate password
-   - Copy the 16-character password
+   - Copy the 16-character password (like: `abcd efgh ijkl mnop`)
 
-3. **Update Alertmanager Configuration**
-   - Edit `monitoring/alertmanager/alertmanager.yml`
-   - Replace `your_app_password_here` with your actual App Password:
-   
-   ```yaml
-   global:
-     smtp_smarthost: 'smtp.gmail.com:587'
-     smtp_from: 'hakanduranyt@gmail.com'
-     smtp_auth_username: 'hakanduranyt@gmail.com'
-     smtp_auth_password: 'abcd efgh ijkl mnop'  # Your 16-character app password
-     smtp_require_tls: true
+3. **Update .env file**
+   ```bash
+   # Replace this line in your .env:
+   ALERT_EMAIL_PASSWORD=your_gmail_app_password_here
+   # With your actual app password:
+   ALERT_EMAIL_PASSWORD=abcd efgh ijkl mnop
    ```
 
-## 📧 Static Configuration
+### 3. **Add to GitHub Secrets (For CI/CD)**
 
-All alerts are currently configured to send to `hakanduranyt@gmail.com`. This is perfect for testing!
+Go to your GitHub repository → Settings → Secrets and variables → Actions
 
-## 🧪 Testing Email Alerts
+Add these secrets:
+```
+ALERT_EMAIL_FROM=your.email@gmail.com
+ALERT_EMAIL_TO=your.email@gmail.com
+ALERT_EMAIL_USERNAME=your.email@gmail.com
+ALERT_EMAIL_PASSWORD=your_gmail_app_password
+SMTP_HOST=smtp.gmail.com:587
+```
+
+## 🧪 **Test Your Setup**
 
 ### 1. Start the monitoring stack:
-
 ```bash
 docker compose up -d
 ```
 
-### 2. Wait for services to start (30-60 seconds), then test:
-
+### 2. Wait 30-60 seconds, then send test alert:
 ```bash
-# Check if Alertmanager is running
-curl http://localhost:9093/-/healthy
-
-# Send a test alert
 curl -X POST http://localhost:9093/api/v1/alerts \
   -H "Content-Type: application/json" \
   -d '[{
     "labels": {
-      "alertname": "TestEmailAlert",
-      "severity": "warning",
+      "alertname": "EmailTest",
+      "severity": "critical",
       "job": "test"
     },
     "annotations": {
-      "summary": "Testing email configuration",
-      "description": "This is a test alert to verify email notifications are working"
+      "summary": "🧪 Testing FlexFit email alerts",
+      "description": "If you receive this email, your monitoring system is working perfectly!"
     }
   }]'
 ```
 
-### 3. Check your email inbox for the test alert!
+### 3. Check your email inbox! 📧
 
-## 🔍 Troubleshooting
+You should receive a **beautiful HTML email** with:
+- 🚨 Critical alert styling
+- 📊 Formatted alert details
+- ⏰ Timestamp information
+
+## 🎯 **Alert Testing Scripts**
+
+We've created **3 different test scripts** to make testing alerts super easy:
+
+### **1. 🚀 Quick One-Liner Test**
+```bash
+./scripts/quick-alert-test.sh
+```
+- **Perfect for**: Quick verification that alerts work
+- **Sends**: Single critical test alert
+- **Time**: 5 seconds
+
+### **2. 📧 Basic Email Test**
+```bash
+./monitoring/test-email-alert.sh
+```
+- **Perfect for**: Testing both critical and warning alert styling
+- **Sends**: Critical + Warning test alerts
+- **Features**: Shows current active alerts, logs checking
+
+### **3. 🎮 Interactive Test Suite**
+```bash
+./scripts/test-alerts.sh
+```
+- **Perfect for**: Comprehensive testing and demonstrations
+- **Features**: Interactive menu with multiple scenarios
+
+#### **Interactive Menu Options:**
+1. **Quick Email Test** - Critical + Warning alerts
+2. **Service Down Alerts** - Simulate service outages
+3. **Performance Alerts** - High CPU, memory, latency alerts
+4. **Database Alerts** - DB connection, slow queries, disk space
+5. **All Real-World Scenarios** - Comprehensive test suite
+6. **View Current Alerts** - See what's currently active
+7. **Clear All Test Alerts** - Clean up test alerts
+8. **Check Alertmanager Config** - Verify configuration
+
+### **Sample Alert Scenarios:**
+
+#### **🔴 Critical Alerts (Red styling):**
+- Service Down
+- Database Connection Lost  
+- Disk Space Critical (>95%)
+- Memory Usage Critical (>90%)
+
+#### **⚠️ Warning Alerts (Orange styling):**
+- High Response Time (>2s)
+- High CPU Usage (>80%)
+- SSL Certificate Expiring
+- Database Slow Queries
+
+### **Test Script Usage Examples:**
+
+```bash
+# Start monitoring stack
+docker compose up -d
+
+# Wait for services to start (30-60 seconds)
+sleep 60
+
+# Option 1: Quick test
+./scripts/quick-alert-test.sh
+
+# Option 2: Comprehensive test with menu
+./scripts/test-alerts.sh
+# Choose option 1 for quick email test
+# Choose option 5 for all scenarios
+
+# Option 3: Original test script
+./monitoring/test-email-alert.sh
+```
+
+### **What You'll Receive:**
+
+**Critical Alert Email:**
+- 🚨 **Red header** with "CRITICAL ALERT"
+- **HTML table** with alert details
+- **Action Required** message
+- **Professional formatting**
+
+**Warning Alert Email:**
+- ⚠️ **Orange header** with "WARNING ALERT"
+- **HTML table** with alert details
+- **Note to review** message
+- **Clean professional styling**
+
+## 🔍 **Troubleshooting**
 
 ### Email not received?
 
@@ -73,51 +200,59 @@ curl -X POST http://localhost:9093/api/v1/alerts \
    docker logs flexfit-alertmanager
    ```
 
-2. **Check Alertmanager configuration**:
+2. **Common Issues**:
+   - ❌ Using regular Gmail password → ✅ Use App Password
+   - ❌ 2FA not enabled → ✅ Enable 2-Factor Authentication
+   - ❌ Wrong email in .env → ✅ Double-check email addresses
+   - ❌ Firewall blocking port 587 → ✅ Check network settings
+
+### 3. **Verify Configuration**:
    ```bash
+   # Check if Alertmanager loaded your config
    curl http://localhost:9093/api/v1/config
    ```
 
-### Common Issues:
+### 4. **Check Active Alerts**:
+   ```bash
+   # View current alerts
+   curl http://localhost:9093/api/v1/alerts
+   
+   # Or use the test script
+   ./scripts/test-alerts.sh
+   # Choose option 6: "View Current Alerts"
+   ```
 
-- **Gmail**: Make sure you're using an App Password, not your regular password
-- **2FA Required**: Most email providers require 2-factor authentication for app passwords
-- **Corporate Email**: May require different SMTP settings or VPN
-- **Firewall**: Check if port 587 is blocked
+### 5. **Test Connectivity**:
+   ```bash
+   # Check if Alertmanager is running
+   curl http://localhost:9093/-/healthy
+   
+   # Check if Prometheus is running
+   curl http://localhost:9090/-/healthy
+   ```
 
-## 📝 That's It!
+## 📝 **Summary**
 
-Since we're using static configuration, you only need to:
-1. ✅ Enable 2FA on `hakanduranyt@gmail.com`
-2. ✅ Generate an App Password 
-3. ✅ Update the password in `monitoring/alertmanager/alertmanager.yml`
+✅ **For Testing**: Use your personal Gmail (Option 1)  
+✅ **For Production**: Create dedicated FlexFit Gmail (Option 3)  
+✅ **Add to**: Both `.env` file AND GitHub Secrets  
+✅ **Remember**: Use Gmail App Password, not regular password!
 
-## 🚀 Ready to Test!
+## 🎯 **What Emails Do What?**
 
-Once your App Password is set in `monitoring/alertmanager/alertmanager.yml`:
+- **`ALERT_EMAIL_FROM`** = WHO sends the email (the sender)
+- **`ALERT_EMAIL_TO`** = WHO receives the email (you!)
+- **`ALERT_EMAIL_USERNAME`** = Gmail login (same as FROM)
+- **`ALERT_EMAIL_PASSWORD`** = Gmail App Password (NOT your regular password!)
 
-```bash
-# Start everything including monitoring
-docker compose up -d
+## 🚀 **Quick Start Checklist**
 
-# Wait 30-60 seconds for services to start, then test:
-curl -X POST http://localhost:9093/api/v1/alerts \
-  -H "Content-Type: application/json" \
-  -d '[{
-    "labels": {
-      "alertname": "EmailTest",
-      "severity": "critical", 
-      "job": "test"
-    },
-    "annotations": {
-      "summary": "Critical test alert for FlexFit monitoring",
-      "description": "If you receive this email, your monitoring alerts are working perfectly!"
-    }
-  }]'
-```
+- [ ] Set up Gmail 2FA
+- [ ] Generate Gmail App Password
+- [ ] Update `.env` with your email settings
+- [ ] Start monitoring: `docker compose up -d`
+- [ ] Test alerts: `./scripts/quick-alert-test.sh`
+- [ ] Check your email inbox! 📧
+- [ ] Add secrets to GitHub for CI/CD
 
-Check `hakanduranyt@gmail.com` inbox - you should receive a nicely formatted HTML email! 📧✨
-
-## 🔄 Making it Configurable Later
-
-Once you understand how it works, we can easily make it configurable with environment variables for different environments (dev/staging/prod). 
+Once setup, you'll get **beautiful email notifications** whenever your FlexFit system has issues! 🚀 
