@@ -62,9 +62,9 @@ services:
     networks:
       - flexfit-network
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/flexfit
-      - SPRING_DATASOURCE_USERNAME=flexfit
-      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD:-flexfit123}
+      - SPRING_DATASOURCE_URL=${POSTGRES_URL:-jdbc:postgresql://db:5432/flexfit}
+      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER:-flexfit}
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:-flexfit123}
       - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://service-registry:8761/eureka
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8081/actuator/health"]
@@ -84,9 +84,9 @@ services:
       - flexfit-network
     environment:
       - SPRING_PROFILES_ACTIVE=docker
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/flexfit
-      - SPRING_DATASOURCE_USERNAME=flexfit
-      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD:-flexfit123}
+      - SPRING_DATASOURCE_URL=${POSTGRES_URL:-jdbc:postgresql://db:5432/flexfit}
+      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER:-flexfit}
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:-flexfit123}
       - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://service-registry:8761/eureka
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8082/actuator/health"]
