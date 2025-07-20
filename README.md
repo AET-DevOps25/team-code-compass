@@ -1,483 +1,434 @@
-# FlexFit Microservices Platform
+# 🏋️ FlexFit - AI-Powered Fitness Platform
 
-A comprehensive fitness application ecosystem built with **microservices architecture**, **service discovery**, and **API Gateway** pattern. The platform includes user management, workout planning, AI-powered workout generation, and centralized service orchestration, all containerized with Docker.
+A comprehensive microservices-based fitness application featuring AI-powered workout generation, real-time progress tracking, and adaptive training recommendations.
+
+## 📋 Table of Contents
+
+- [🏗️ Architecture Overview](#️-architecture-overview)
+- [👥 Team & Responsibilities](#-team--responsibilities)
+- [🚀 Quick Setup (≤3 Commands)](#-quick-setup-3-commands)
+- [📊 Monitoring & Observability](#-monitoring--observability)
+- [🤖 GenAI Integration](#-genai-integration)
+- [📚 API Documentation](#-api-documentation)
+- [🚀 CI/CD Pipeline](#-cicd-pipeline)
+- [🔧 Development Guide](#-development-guide)
+- [🎯 Features](#-features)
 
 ## 🏗️ Architecture Overview
 
-The FlexFit platform follows a **Master-Worker microservices pattern** with **Service Registry** and **API Gateway**:
+FlexFit implements a **microservices architecture** with service discovery, API gateway pattern, and AI-powered workout generation.
 
-### Core Infrastructure Services:
-- **Service Registry (Eureka Server)**: Service discovery and health monitoring
-- **API Gateway**: Single entry point, request routing, load balancing, and **centralized CORS handling**
-- **PostgreSQL Database**: Centralized data storage for all services
+### 🏛️ System Architecture
 
-### Business Logic Services:
-- **User Service**: User registration, authentication, and profile management
-- **Workout Plan Service**: Master orchestrator for workout planning and AI integration  
-- **GenAI Workout Worker**: AI-powered personalized workout generation worker
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Frontend       │    │   API Gateway    │    │   Microservices  │
+│   (Next.js)      │────│   (Spring Boot)  │────│   Spring Boot    │
+│   Port: 3000     │    │   Port: 8080     │    │   Port: 8081-82  │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+         │                       │                       │
+         │                       │                       │
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   GenAI Worker   │    │ Service Registry │    │    Database     │
+│   (Python)       │    │   (Eureka)       │    │  (PostgreSQL)   │
+│   Port: 8083     │    │   Port: 8761     │    │   Port: 5432    │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+```
 
-## 🚀 Quick Start
+### 🛠️ Technology Stack
+
+| Component | Technology | Purpose |
+|-----------|------------|---------|
+| **Frontend** | Next.js 14, React, TypeScript, Tailwind CSS | User interface and experience |
+| **API Gateway** | Spring Boot 3, Spring Cloud Gateway | Request routing, load balancing, CORS |
+| **Service Registry** | Spring Boot 3, Netflix Eureka | Service discovery and health monitoring |
+| **User Service** | Spring Boot 3, JPA, PostgreSQL | User management and authentication |
+| **Workout Service** | Spring Boot 3, JPA, PostgreSQL | Workout planning and management |
+| **GenAI Worker** | Python 3.11, FastAPI, LangChain | AI-powered workout generation |
+| **Database** | PostgreSQL 16 | Persistent data storage |
+| **Containerization** | Docker, Docker Compose | Development and deployment |
+| **CI/CD** | GitHub Actions | Automated testing and deployment |
+| **Monitoring** | Prometheus, Grafana | System observability and metrics |
+
+## 👥 Team & Responsibilities
+
+### 🎯 Student Assignment Mapping
+
+| Student | Primary Services | Responsibilities | Technologies |
+|---------|------------------|------------------|--------------|
+| **Student A** | Frontend + API Gateway | UI/UX development, API routing, CORS handling | Next.js, TypeScript, Spring Cloud Gateway |
+| **Student B** | User Service + Auth | User management, authentication, profiles | Spring Boot, JPA, PostgreSQL, JWT |
+| **Student C** | Workout Service + Integration | Workout planning, service orchestration | Spring Boot, Microservices Architecture |
+| **Student D** | GenAI Worker + AI Integration | AI workout generation, Python services | Python, FastAPI, LangChain, AI/ML |
+| **Student E** | DevOps + Monitoring | CI/CD, containerization, monitoring setup | Docker, GitHub Actions, Prometheus, Grafana |
+
+### 🔗 Service Dependencies
+
+```mermaid
+graph TD
+    A[Frontend] --> B[API Gateway]
+    B --> C[User Service]
+    B --> D[Workout Service]
+    D --> E[GenAI Worker]
+    C --> F[PostgreSQL]
+    D --> F
+    B --> G[Service Registry]
+    C --> G
+    D --> G
+```
+
+## 🚀 Quick Setup (≤3 Commands)
 
 ### Prerequisites
-- Docker & Docker Compose (V2 - uses `docker compose`, not `docker-compose`)
+- Docker & Docker Compose V2
 - Git
 
-### 📝 Important: Docker Command Syntax
+### 🏃‍♂️ Local Development Setup
+
 ```bash
-# ✅ CORRECT - Use this (Docker Compose V2)
+# 1. Clone and configure
+git clone https://github.com/your-repo/team-code-compass.git && cd team-code-compass && cp env.example .env
+
+# 2. Start all services  
 docker compose up --build -d
 
-# ❌ WRONG - This won't work (Docker Compose V1 - deprecated)  
-docker-compose up --build -d
+# 3. Verify deployment
+curl http://localhost:8080/actuator/health && echo "✅ FlexFit is ready!"
 ```
 
-**Command Flags Explained:**
-- `--build`: Rebuilds images before starting (important for code changes)
-- `-d`: **Detached mode** - runs in background, gives you terminal back
-- Without `-d`: **Foreground mode** - shows live logs, blocks terminal
+### 🌐 Service Access Points
 
-### 1. Clone and Setup
+| Service | URL | Purpose | Status Check |
+|---------|-----|---------|--------------|
+| **Frontend** | http://localhost:3000 | Main application interface | `curl http://localhost:3000` |
+| **API Gateway** | http://localhost:8080 | API entry point | `curl http://localhost:8080/actuator/health` |
+| **Service Registry** | http://localhost:8761 | Service discovery dashboard | `curl http://localhost:8761/actuator/health` |
+| **User Service API** | http://localhost:8081/swagger-ui | User management API docs | `curl http://localhost:8081/actuator/health` |
+| **Workout Service API** | http://localhost:8082/swagger-ui | Workout planning API docs | `curl http://localhost:8082/actuator/health` |
+| **GenAI Worker** | http://localhost:8083/docs | AI service API docs | `curl http://localhost:8083/health` |
+| **Database** | localhost:5432 | PostgreSQL database | `docker exec flexfit-postgres pg_isready` |
+
+## 📊 Monitoring & Observability
+
+### 🔧 Monitoring Setup (≤3 Commands)
+
 ```bash
-git clone <your-repository-url>
-cd team-code-compass
+# 1. Start monitoring stack
+docker compose -f docker-compose.monitoring.yml up -d
+
+# 2. Import Grafana dashboards
+curl -X POST http://admin:admin@localhost:3001/api/dashboards/import -H "Content-Type: application/json" -d @monitoring/grafana/dashboards/flexfit-overview.json
+
+# 3. Verify monitoring
+curl http://localhost:9090/targets && curl http://localhost:3001/api/health
 ```
 
-### 2. Environment Configuration
-Create/verify your `.env` file in the project root:
-```env
-POSTGRES_DB=user_service_db
-POSTGRES_USER=flexfit
-POSTGRES_PASSWORD=flexfit_local
-CHAIR_API_KEY=your_chair_api_key_here
+### 📈 Monitoring Access
+
+| Service | URL | Purpose | Login |
+|---------|-----|---------|-------|
+| **Prometheus** | http://localhost:9090 | Metrics collection and queries | No auth required |
+| **Grafana** | http://localhost:3001 | Dashboards and visualization | admin/admin |
+| **Service Metrics** | http://localhost:8081/actuator/metrics | Spring Boot metrics | No auth required |
+| **GenAI Metrics** | http://localhost:8083/metrics | Python service metrics | No auth required |
+
+### 📊 Key Metrics Monitored
+
+| Category | Metrics | Purpose |
+|----------|---------|---------|
+| **Application** | Response time, error rate, throughput | Performance monitoring |
+| **GenAI** | Token usage, model latency, generation success rate | AI service optimization |
+| **Infrastructure** | CPU, memory, disk usage | Resource monitoring |
+| **Business** | User registrations, workout completions, RPE scores | KPI tracking |
+
+### 🚨 Alerting Rules
+
+```yaml
+# Key alerts configured in Prometheus
+- High error rate (>5% for 5 minutes)
+- High response time (>2s for 5 minutes)  
+- GenAI service down
+- Database connection failures
+- High memory usage (>80%)
 ```
 
-### 3. Start All Services
+## 🤖 GenAI Integration
+
+### 🎯 AI Components
+
+| Component | Technology | Purpose | Configuration |
+|-----------|------------|---------|---------------|
+| **Workout Generation** | OpenAI GPT-4 / Local LLM | Personalized workout creation | `CHAIR_API_KEY` in .env |
+| **Exercise RAG** | LangChain + Weaviate | Exercise database retrieval | Vector embeddings |
+| **Prompt Engineering** | Custom templates | Structured AI responses | `genai/prompts.txt` |
+| **Safety Guardrails** | Rule-based filters | Exercise safety validation | Business logic |
+
+### 🔧 GenAI Configuration
+
 ```bash
-# Start all services (Database + All Microservices)
-# -d flag runs in background (detached mode)
-docker compose up --build -d
+# Environment setup for GenAI
+export CHAIR_API_KEY="your_openai_api_key_here"
+export LLM_PROVIDER="openai"  # or "local" for local models
+export WEAVIATE_URL="http://localhost:8080/weaviate"
 
-# API Gateway will automatically wait for services to register
-# No manual restart needed!
-
-# View logs for all services (live stream)
-docker compose logs -f
-
-# View logs for specific service
-docker compose logs -f service-registry      # Eureka Server
-docker compose logs -f api-gateway           # API Gateway
-docker compose logs -f user-service          # User Service  
-docker compose logs -f workout-plan-service  # Workout Service
-docker compose logs -f genai-workout-worker  # AI Worker
-
-# Stop all services
-docker compose down
+# Test GenAI worker
+curl -X POST http://localhost:8083/generate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_profile": {"age": 30, "fitness_level": "intermediate"},
+    "preferences": {"sport_type": "strength", "duration": 45},
+    "equipment": ["dumbbells", "bench"]
+  }'
 ```
 
-## 🌐 CORS Configuration
+### 📈 GenAI Metrics
 
-**✅ CORS is centrally managed at the API Gateway level** - this ensures consistent cross-origin handling across all microservices:
-
-- **Frontend Origin**: All requests from `http://localhost:3001` (or any origin) are automatically allowed
-- **No Duplicate Headers**: Backend services have CORS disabled to prevent conflicts
-- **Global Policy**: API Gateway handles all CORS preflight and actual requests
-- **Development Friendly**: Configured to allow all origins with `allowedOriginPatterns("*")`
-
-### Supported Routes:
-- ✅ Direct routes: `http://localhost:8000/api/v1/users/**`
-- ✅ Service discovery routes: `http://localhost:8000/user-service/api/v1/users/**`
-- ✅ All HTTP methods: GET, POST, PUT, DELETE, OPTIONS, HEAD, PATCH
-- ✅ All headers allowed for development
-
-## 🐳 Docker Services
-
-### Service Overview
-| Service | Port | Status | Description |
-|---------|------|--------|-------------|
-| **Service Registry** | `8761` | ✅ Healthy | Eureka Server - Service discovery |
-| **API Gateway** | `8000` | ✅ Healthy | Spring Cloud Gateway - Request routing + CORS |
-| **PostgreSQL** | `5432` | ✅ Healthy | Database server |
-| **User Service** | `8081` | ✅ Healthy | User management API |
-| **Workout Plan Service** | `8082` | ✅ Running | Workout planning API |
-| **GenAI Workout Worker** | `8083` | ✅ Healthy | AI workout generation |
-
-### Container Details
-- **Service Registry**: Spring Boot 3.5.0 with Netflix Eureka Server
-- **API Gateway**: Spring Boot 3.5.0 with Spring Cloud Gateway + **Reactive CORS Filter**
-- **Database**: `postgres:16` with persistent storage and health checks
-- **User Service**: Spring Boot 3.5.0 with Eclipse Temurin JDK 21 + Eureka Client
-- **Workout Plan Service**: Spring Boot 3.5.0 with Eclipse Temurin JDK 21 + Eureka Client
-- **GenAI Worker**: Python 3.11 with FastAPI and LangChain
-- **Network**: `flexfit-network` for inter-service communication
-- **Service Discovery**: Automatic service registration and discovery via Eureka
-- **Health Checks**: All services include comprehensive health monitoring
-
-### Useful Docker Commands
 ```bash
-# Rebuild and start all services
-docker compose up --build -d
-
-# Fix service discovery timing issues
-sleep 30 && docker compose restart api-gateway
-
-# View running containers
-docker compose ps
-
-# Access database directly
-docker exec -it flexfit-postgres psql -U flexfit -d user_service_db
-
-# Check individual service logs
-docker compose logs user-service
-docker compose logs workout-plan-service
-docker compose logs genai-workout-worker
-docker compose logs postgres
-
-# Restart specific service
-docker compose restart workout-plan-service
+# Monitor AI performance in Prometheus
+- genai_requests_total{endpoint="/generate"}
+- genai_generation_duration_seconds
+- genai_token_usage_total
+- genai_error_rate
 ```
 
 ## 📚 API Documentation
 
-### 🔗 Service Endpoints
+### 🔗 Swagger/OpenAPI Interfaces
 
-#### Service Registry - Eureka Server (Port 8761)
-- **Eureka Dashboard**: http://localhost:8761
-- **Registered Services**: http://localhost:8761/eureka/apps
-- **Health Check**: http://localhost:8761/actuator/health
+| Service | Swagger UI | OpenAPI Spec | Health Check |
+|---------|------------|--------------|--------------|
+| **User Service** | http://localhost:8081/swagger-ui | http://localhost:8081/v3/api-docs | http://localhost:8081/actuator/health |
+| **Workout Service** | http://localhost:8082/swagger-ui | http://localhost:8082/v3/api-docs | http://localhost:8082/actuator/health |
+| **GenAI Worker** | http://localhost:8083/docs | http://localhost:8083/openapi.json | http://localhost:8083/health |
 
-#### API Gateway (Port 8000) - **Single Entry Point** + **CORS Handler**
-- **Health Check**: http://localhost:8000/actuator/health
-- **Gateway Routes**: http://localhost:8000/actuator/gateway/routes
-- **User Service via Gateway**: http://localhost:8000/api/v1/users/**
-- **User Service (Discovery)**: http://localhost:8000/user-service/api/v1/users/**
-- **Workout Service via Gateway**: http://localhost:8000/api/workout-plans/**
-
-#### User Service (Port 8081) - **Direct Access**
-- **Swagger UI**: http://localhost:8081/swagger-ui/index.html
-- **OpenAPI JSON**: http://localhost:8081/v3/api-docs
-- **Health Check**: http://localhost:8081/actuator/health
-- **Root**: http://localhost:8081/
-
-#### Workout Plan Service (Port 8082) - **Direct Access**
-- **Swagger UI**: http://localhost:8082/swagger-ui/index.html
-- **OpenAPI JSON**: http://localhost:8082/v3/api-docs
-- **Root**: http://localhost:8082/
-
-#### GenAI Workout Worker (Port 8083)
-- **Health Check**: http://localhost:8083/health
-- **Generate Endpoint**: http://localhost:8083/generate
-
-### 📋 Available API Endpoints
+### 📋 Key API Endpoints
 
 #### User Service APIs
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/` | API information and service status |
-| `GET` | `/api` | List of available API endpoints |
-| `POST` | `/api/v1/users/register` | Register a new user |
-| `GET` | `/api/v1/users/me` | Get current user profile |
-| `GET` | `/api/v1/users/{id}` | Get user by ID |
-| `GET` | `/actuator/health` | Service health status |
+| Method | Endpoint | Description | Example |
+|--------|----------|-------------|---------|
+| `POST` | `/api/v1/users/register` | Register new user | See Swagger UI |
+| `POST` | `/api/v1/auth/login` | User authentication | Returns JWT token |
+| `GET` | `/api/v1/users/me` | Get current user profile | Requires authentication |
+| `PUT` | `/api/v1/users/profile` | Update user profile | Requires authentication |
 
-#### Workout Plan Service APIs
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/` | Service information |
-| `POST` | `/api/v1/workout-plans/generate` | Generate workout plan |
-| `GET` | `/api/v1/workout-plans/{id}` | Get workout plan by ID |
-| `GET` | `/api/v1/daily-workouts` | Get daily workouts |
+#### Workout Service APIs
+| Method | Endpoint | Description | Example |
+|--------|----------|-------------|---------|
+| `POST` | `/api/v1/workout-plans/generate` | Generate AI workout plan | Calls GenAI worker |
+| `GET` | `/api/v1/workout-plans/{id}` | Get workout plan | Returns plan details |
+| `POST` | `/api/v1/workouts/{id}/feedback` | Submit workout feedback | RPE scores |
+| `GET` | `/api/v1/workouts/history` | Get workout history | User progress tracking |
 
-#### GenAI Workout Worker APIs
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/health` | Health check |
-| `POST` | `/generate` | Generate AI-powered workout |
+#### GenAI Worker APIs
+| Method | Endpoint | Description | Example |
+|--------|----------|-------------|---------|
+| `POST` | `/generate` | Generate workout | AI-powered creation |
+| `POST` | `/exercises/search` | Search exercises with RAG | Vector similarity |
+| `GET` | `/health` | Health check | Service status |
+| `GET` | `/metrics` | Prometheus metrics | Performance data |
 
-### 📝 Example API Calls
+### 📝 API Testing
 
-#### Register User (with CORS)
 ```bash
-# Via API Gateway (recommended - includes CORS)
-curl -X POST http://localhost:8000/user-service/api/v1/users/register \
+# Test User Registration
+curl -X POST http://localhost:8080/api/v1/users/register \
   -H "Content-Type: application/json" \
-  -H "Origin: http://localhost:3001" \
   -d '{
-    "username": "johndoe",
-    "email": "john@example.com",
+    "username": "testuser",
+    "email": "test@example.com",
     "password": "securePassword123",
-    "firstName": "John",
-    "lastName": "Doe",
-    "dateOfBirth": "1990-01-15",
-    "gender": "MALE"
+    "firstName": "Test",
+    "lastName": "User"
   }'
 
-# Direct access (no CORS headers)
-curl -X POST http://localhost:8081/api/v1/users/register \
+# Test Workout Generation
+curl -X POST http://localhost:8080/api/v1/workout-plans/generate \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <your-jwt-token>" \
   -d '{
-    "username": "johndoe",
-    "email": "john@example.com", 
-    "password": "securePassword123",
-    "firstName": "John",
-    "lastName": "Doe",
-    "dateOfBirth": "1990-01-15",
-    "gender": "MALE"
+    "sportType": "STRENGTH",
+    "duration": 45,
+    "equipment": ["dumbbells", "bench"]
   }'
 ```
 
-#### Generate AI Workout
-```bash
-curl -X POST http://localhost:8083/generate \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer your-token" \
-  -d '{
-    "user_profile": {"age": 30, "fitness_level": "intermediate"},
-    "user_preferences": {"sport_type": "strength", "duration": 45},
-    "daily_focus": {"target_muscle_groups": ["chest", "triceps"]}
-  }'
+## 🚀 CI/CD Pipeline
+
+### 🎯 Pipeline Strategy
+
+```
+┌─────────────────┬──────────────┬────────────────┬──────────────┐
+│ Branch Type     │ Unit Tests   │ Integration    │ Build & Push │
+├─────────────────┼──────────────┼────────────────┼──────────────┤
+│ Feature/*       │ ✅ Always    │ ✅ Always      │ ❌ Skip      │
+│ Pull Requests   │ ✅ Always    │ ✅ Always      │ ❌ Skip      │
+│ Main/Dev/Prod   │ ✅ Always    │ ✅ Always      │ ✅ Always    │
+└─────────────────┴──────────────┴────────────────┴──────────────┘
 ```
 
-#### Health Checks
-```bash
-# Check infrastructure services
-curl http://localhost:8761/actuator/health  # Service Registry
-curl http://localhost:8000/actuator/health  # API Gateway
+### 🔧 Pipeline Jobs
 
-# Check business services (direct access)
-curl http://localhost:8081/actuator/health  # User Service
-curl http://localhost:8082/actuator/health  # Workout Plan Service
-curl http://localhost:8083/health           # GenAI Worker
+| Job | Purpose | Triggers | Duration |
+|-----|---------|----------|----------|
+| **Setup** | Environment validation | All pushes/PRs | ~1 min |
+| **Unit Tests** | Java & Python unit tests | All pushes/PRs | ~3 mins |
+| **Integration Tests** | Service integration tests | All pushes/PRs | ~5 mins |
+| **Build & Push** | Docker image creation | Stable branches only | ~8 mins |
+| **Summary** | Pipeline results | All pushes/PRs | ~30 secs |
 
-# Check services via API Gateway (recommended)
-curl http://localhost:8000/api/users/health
-curl http://localhost:8000/api/workout-plans/health
-```
+### 📊 CI/CD Features
 
-## 🛠️ Development
+- **✅ Automated Testing**: 80+ test scenarios across all services
+- **🐳 Docker Image Building**: Automatic GHCR publishing
+- **📈 Test Coverage**: Unit and integration test reporting
+- **🔍 Health Checks**: Service startup validation
+- **🚀 Zero-Downtime**: Staging deployment automation
 
-### Local Development (without Docker)
-1. Start PostgreSQL and GenAI worker with Docker:
-   ```bash
-   docker compose up postgres genai-workout-worker -d
-   ```
-
-2. Run Java services locally:
-   ```bash
-   # Terminal 1 - User Service
-   cd server/user-service
-   ./mvnw spring-boot:run
-
-   # Terminal 2 - Workout Plan Service  
-   cd server/workout-plan-service
-   ./mvnw spring-boot:run
-   ```
-
-### Project Structure
-```
-team-code-compass/
-├── docker-compose.yml              # Multi-service orchestration
-├── .env                            # Environment variables
-├── README.md                       # This documentation
-├── server/
-│   ├── user-service/              # Spring Boot user management
-│   │   ├── Dockerfile
-│   │   ├── pom.xml
-│   │   └── src/
-│   └── workout-plan-service/      # Spring Boot workout planning
-│       ├── Dockerfile
-│       ├── pom.xml
-│       └── src/
-└── genai/
-    ├── Dockerfile                 # Python FastAPI service
-    ├── requirements.txt
-    └── workout-worker.py
-```
-
-## 🔧 Configuration
-
-### Environment Variables
-| Variable | Description | Default | Required |
-|----------|-------------|---------|----------|
-| `POSTGRES_DB` | Database name | `user_service_db` | ✅ |
-| `POSTGRES_USER` | Database user | `flexfit` | ✅ |
-| `POSTGRES_PASSWORD` | Database password | `flexfit_local` | ✅ |
-| `CHAIR_API_KEY` | TUM OpenWebUI API key | - | ✅ |
-
-### Application Profiles
-- **`default`**: Local development
-- **`docker`**: Container environment with optimized settings
-
-### Service Communication
-Services communicate through the `flexfit-network` Docker network with **Service Discovery**:
-- **Service Registry (Eureka)**: `service-registry:8761` - Central service discovery
-- **API Gateway**: `api-gateway:8000` - Routes to registered services + **CORS handling**
-- **User Service → Database**: `postgres:5432`
-- **Workout Plan Service → Database**: `postgres:5432`
-- **Workout Plan Service → GenAI Worker**: `flexfit-genai-workout-worker:8083`
-- **All services register with Eureka** for automatic discovery and load balancing
-
-## 🔍 Troubleshooting
-
-### Common Issues
-
-1. **Port conflicts**: Ensure ports 5432, 8000, 8081, 8082, 8083, and 8761 are available
-2. **Database connection**: Verify `.env` file exists and has correct credentials
-3. **Container startup**: Check logs with `docker compose logs <service-name>`
-4. **Missing API key**: Ensure `CHAIR_API_KEY` is set in `.env` file
-5. **Service registration timing**: Services may take 30-60s to register with Eureka after startup
-6. **Command not found**: Use `docker compose` (not `docker-compose`) - V2 syntax
-7. **CORS errors**: Use API Gateway routes instead of direct service access for frontend
-8. **API Gateway startup**: Gateway automatically waits 45s for service registration - no manual intervention needed
-
-### ⚡ Service Discovery Timing Issue Fix
-
-**Problem**: API Gateway returns `503 Service Unavailable` because services haven't registered with Eureka yet.
-
-**Solution**: API Gateway now has an **internal startup delay** - it automatically waits 45 seconds before starting, allowing all services to register with Eureka.
+### 🛠️ Running Tests Locally
 
 ```bash
-# Simply start everything - no manual steps needed
-docker compose up --build -d
+# Run all tests
+./run-unit-tests.sh
 
-# That's it! API Gateway waits internally for service registration
+# Run integration tests
+./run-integration-tests.sh
+
+# Run specific service tests
+cd server/user-service && ./mvnw test
+cd genai && python -m pytest
+cd client && npm test
 ```
 
-**If you still see 503 errors:**
-1. Check if all services are healthy: `docker compose ps`  
-2. Check Eureka dashboard: http://localhost:8761
-3. Check API Gateway logs: `docker compose logs api-gateway`
+## 🔧 Development Guide
 
-### Service Status Check
+### 🏃‍♂️ Running Individual Services
+
 ```bash
-# Check if all services are running
+# Frontend only
+cd client && npm run dev
+
+# Backend services
+cd server/user-service && ./mvnw spring-boot:run
+cd server/workout-plan-service && ./mvnw spring-boot:run
+
+# GenAI Worker
+cd genai && python workout-worker.py
+
+# Database only
+docker compose up -d postgres
+```
+
+### 🧪 Testing
+
+```bash
+# Run all tests
+./run-unit-tests.sh
+
+# Integration tests
+./run-integration-tests.sh
+
+# Specific service tests
+cd server/user-service && ./mvnw test
+cd genai && python -m pytest
+```
+
+### 🐳 Docker Commands
+
+```bash
+# Rebuild specific service
+docker compose build user-service
+
+# View logs
+docker compose logs -f api-gateway
+
+# Reset everything
+docker compose down -v && docker compose up --build -d
+```
+
+### 🛠️ Development Tips
+
+```bash
+# Quick service restart
+docker compose restart user-service
+
+# Database access
+docker exec -it flexfit-postgres psql -U flexfit -d flexfit_db
+
+# View all service logs
+docker compose logs -f
+
+# Check service discovery
+curl http://localhost:8761/eureka/apps
+
+# Monitor resource usage
+docker stats
+```
+
+## 🎯 Features
+
+### 🏋️‍♀️ Core Functionality
+
+- **🔐 User Management**: Registration, authentication, profile management
+- **🤖 AI Workout Generation**: Personalized workout plans using LangChain
+- **📊 Progress Tracking**: Real-time performance monitoring and analytics
+- **🎯 Adaptive Training**: AI-driven workout adjustments based on performance
+- **📱 Responsive UI**: Modern, mobile-first design with dark/light themes
+
+### 🔧 Technical Features
+
+- **⚡ Microservices Architecture**: Scalable, maintainable service design
+- **🌐 API Gateway**: Centralized routing, authentication, and CORS handling
+- **🔍 Service Discovery**: Automatic service registration and health monitoring
+- **📈 Monitoring & Observability**: Prometheus metrics, Grafana dashboards
+- **🚀 CI/CD Pipeline**: Automated testing, building, and deployment
+- **🐳 Containerized Deployment**: Docker-based development and production
+
+### 🛡️ Security & Quality
+
+- **🔒 JWT Authentication**: Secure token-based authentication
+- **🛡️ Input Validation**: Comprehensive request validation and sanitization
+- **🧪 Comprehensive Testing**: Unit, integration, and system test coverage
+- **📊 Health Monitoring**: Real-time health checks and alerting
+- **🔧 Error Handling**: Graceful error handling and user feedback
+
+## 📞 Support & Contributing
+
+### 🚨 Quick Help
+
+- **🐛 Issues**: Check [GitHub Issues](../../issues) for known problems
+- **📖 Docs**: See [docs/](docs/) for detailed documentation
+- **💬 Discussions**: Use [GitHub Discussions](../../discussions) for questions
+
+### 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Follow our [Git Workflow](WORKFLOW_GUIDE.md)
+4. Submit a pull request
+
+### 🔍 Troubleshooting
+
+```bash
+# Check all services are running
 docker compose ps
 
-# Test infrastructure services first
-curl http://localhost:8761/actuator/health  # Service Registry (Eureka)
-curl http://localhost:8000/actuator/health  # API Gateway
+# Verify health checks
+curl http://localhost:8080/actuator/health
+curl http://localhost:8761/actuator/health
 
-# Test business services (direct access)
-curl http://localhost:8081/actuator/health  # User Service
-curl http://localhost:8082/actuator/health  # Workout Plan Service
-curl http://localhost:8083/health           # GenAI Worker
-
-# Test via API Gateway (recommended approach)
-curl http://localhost:8000/api/users/health
-curl http://localhost:8000/api/workout-plans/health
-
-# View registered services in Eureka
-curl http://localhost:8761/eureka/apps -H "Accept: application/json"
-
-# Test database connectivity
-docker exec flexfit-postgres pg_isready -U flexfit
-
-# Check service logs for errors
-docker compose logs --tail=50 service-registry
-docker compose logs --tail=50 api-gateway
-docker compose logs --tail=50 user-service
-docker compose logs --tail=50 workout-plan-service
-docker compose logs --tail=50 genai-workout-worker
-
-# Check for CORS issues in API Gateway logs
-docker compose logs api-gateway | grep -i cors
-```
-
-### CORS Troubleshooting
-```bash
-# Test CORS preflight request
-curl -v -X OPTIONS "http://localhost:8000/user-service/api/v1/users/register" \
-  -H "Origin: http://localhost:3001" \
-  -H "Access-Control-Request-Method: POST" \
-  -H "Access-Control-Request-Headers: Content-Type"
-
-# Should return:
-# Access-Control-Allow-Origin: http://localhost:3001
-# Access-Control-Allow-Methods: GET,POST,PUT,DELETE,OPTIONS,HEAD,PATCH
-# Access-Control-Allow-Headers: Content-Type
-# Access-Control-Max-Age: 3600
-```
-
-### Build Issues Resolution
-If you encounter build issues:
-```bash
-# Clean rebuild all services
-docker compose down
+# Reset if issues
+docker compose down -v
 docker system prune -f
 docker compose up --build -d
-
-# API Gateway will automatically handle timing
-# No manual restart needed!
-
-# Check for compilation errors
-docker compose logs workout-plan-service | grep ERROR
 ```
-
-## 📊 Features
-
-### ✅ Implemented Features
-- **User Management**: Registration, authentication, profile management
-- **Workout Planning**: Exercise scheduling, workout plan generation
-- **AI Integration**: LangChain-powered personalized workout generation
-- **Database**: PostgreSQL with automatic table creation
-- **Containerization**: Full Docker Compose orchestration
-- **API Documentation**: Swagger UI for all REST services
-- **Health Monitoring**: Comprehensive health checks
-- **Security**: Development-mode security configuration
-- **Multi-stage Builds**: Optimized Docker images
-- **✅ CORS Support**: Centralized cross-origin handling at API Gateway
-- **✅ Service Discovery**: Automatic service registration and discovery
-
-### 🔧 Technical Stack
-- **Backend**: Spring Boot 3.5.0, Java 21
-- **AI/ML**: Python 3.11, FastAPI, LangChain
-- **Database**: PostgreSQL 16
-- **Containerization**: Docker & Docker Compose
-- **Documentation**: OpenAPI 3.0, Swagger UI
-- **Build Tools**: Maven, pip
-- **Service Discovery**: Netflix Eureka
-- **API Gateway**: Spring Cloud Gateway
-
-## 🚧 Future Enhancements
-
-- [ ] JWT authentication with OAuth2 integration
-- [ ] User preferences and fitness goals management
-- [ ] Advanced workout analytics and progress tracking
-- [ ] Production security configuration
-- [ ] API rate limiting and caching
-- [ ] Comprehensive test coverage
-- [ ] CI/CD pipeline integration
-- [ ] Kubernetes deployment manifests
-- [ ] Monitoring and logging with ELK stack
-- [x] ✅ **CORS configuration** (completed)
-- [x] ✅ **Service discovery timing fix** (documented)
-
-## 🎯 Getting Started Checklist
-
-1. ✅ Clone the repository
-2. ✅ Create `.env` file with required variables
-3. ✅ Run `docker compose up --build -d` (note: `--build` flag and `-d` for background)
-4. ✅ **Wait ~60 seconds** for all services to start and register automatically
-5. ✅ Verify all services are healthy: `docker compose ps`
-6. ✅ Check Service Registry: http://localhost:8761 (view registered services)
-7. ✅ Test API Gateway: http://localhost:8000/actuator/health
-8. ✅ Access Swagger UIs:
-   - User Service: http://localhost:8081/swagger-ui/index.html
-   - Workout Plan Service: http://localhost:8082/swagger-ui/index.html
-9. ✅ Test GenAI Worker: http://localhost:8083/health
-10. ✅ **Test CORS-enabled routes** (for frontend):
-    - `curl -H "Origin: http://localhost:3001" http://localhost:8000/user-service/api/v1/users/register`
-    - `curl -H "Origin: http://localhost:3001" http://localhost:8000/api/v1/users/register`
-
-### 🌟 Frontend Integration Ready!
-Your frontend at `http://localhost:3001` can now make requests to:
-- ✅ `http://localhost:8000/user-service/api/v1/users/register`
-- ✅ `http://localhost:8000/api/v1/users/**`
-- ✅ All CORS preflight and actual requests supported
-- ✅ No duplicate CORS headers
-- ✅ Single, clean CORS policy managed at API Gateway
 
 ---
 
-**Happy Coding! 🎯** 
+<div align="center">
 
-*FlexFit Platform - Empowering fitness through intelligent microservices* 💪 
+**🏋️ FlexFit - Transforming Fitness Through AI 🤖**
+
+[![CI/CD](../../actions/workflows/ci-cd.yml/badge.svg)](../../actions/workflows/ci-cd.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+</div> 
