@@ -149,6 +149,7 @@ jobs:
         run: |
           echo "🌐 Running client tests..."
           cd client && node tests/core-workflows.test.js
+          cd client && node tests/ai-preference-integration.test.js
           echo "✅ Client tests completed"
 
       - name: 📊 Unit Test Summary
@@ -203,15 +204,6 @@ jobs:
           chmod +x run-integration-tests.sh
           ./run-integration-tests.sh --start-only
           echo "✅ Services started"
-
-      - name: 🏥 Health checks
-        run: |
-          echo "🏥 Running health checks..."
-          sleep 30
-          curl -f http://localhost:8080/actuator/health || exit 1
-          curl -f http://localhost:8081/actuator/health || exit 1
-          curl -f http://localhost:8082/actuator/health || exit 1
-          echo "✅ Health checks passed"
 
       - name: 🔗 Run Integration Tests
         run: |

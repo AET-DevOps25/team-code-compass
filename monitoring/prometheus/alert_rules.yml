@@ -1,0 +1,108 @@
+groups:
+  - name: flexfit_services
+    rules:
+      # Service Down Alerts
+      - alert: ServiceDown
+        expr: up == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "FlexFit service {{ $labels.job }} is down"
+          description: "Service {{ $labels.job }} has been down for more than 30 seconds"
+
+      # High Response Time Alerts
+      - alert: HighResponseTime
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High response time for {{ $labels.job }}"
+          description: "95th percentile response time for {{ $labels.job }} is {{ $value }} seconds"
+
+      # API Gateway High Response Time
+      - alert: APIGatewaySlowResponse
+        expr: histogram_quantile(0.95, rate(spring_cloud_gateway_requests_seconds_bucket[5m])) > 1
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "API Gateway slow response time"
+          description: "API Gateway 95th percentile response time is {{ $value }} seconds"
+
+      # High Error Rate Alerts
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High error rate for {{ $labels.job }}"
+          description: "Error rate for {{ $labels.job }} is {{ $value | humanizePercentage }}"
+
+  - name: flexfit_genai
+    rules:
+      # GenAI Service Specific Alerts
+      - alert: GenAIWorkerDown
+        expr: up{job=~"genai-worker.*"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "GenAI Worker {{ $labels.job }} is down"
+          description: "GenAI Worker {{ $labels.job }} has been down for more than 1 minute"
+
+      # GenAI High Generation Time
+      - alert: GenAISlowGeneration
+        expr: histogram_quantile(0.95, rate(genai_generation_duration_seconds_bucket[5m])) > 30
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "GenAI generation is slow"
+          description: "GenAI 95th percentile generation time is {{ $value }} seconds"
+
+      # Local GenAI High Generation Time
+      - alert: LocalGenAISlowGeneration
+        expr: histogram_quantile(0.95, rate(genai_local_request_duration_seconds_bucket[5m])) > 60
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Local GenAI generation is slow"
+          description: "Local GenAI 95th percentile generation time is {{ $value }} seconds"
+
+  - name: flexfit_database
+    rules:
+      # Database Connection Issues
+      - alert: DatabaseConnectionHigh
+        expr: hikaricp_connections_active / hikaricp_connections_max > 0.8
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High database connection usage"
+          description: "Database connection pool usage is {{ $value | humanizePercentage }} for {{ $labels.application }}"
+
+  - name: flexfit_jvm
+    rules:
+      # JVM Memory Usage
+      - alert: HighJVMMemoryUsage
+        expr: jvm_memory_used_bytes / jvm_memory_max_bytes > 0.9
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High JVM memory usage"
+          description: "JVM memory usage is {{ $value | humanizePercentage }} for {{ $labels.application }}"
+
+      # JVM Garbage Collection
+      - alert: HighGCTime
+        expr: rate(jvm_gc_collection_seconds_sum[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High garbage collection time"
+          description: "GC time is {{ $value }} seconds per second for {{ $labels.application }}" 

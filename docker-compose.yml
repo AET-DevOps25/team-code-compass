@@ -1,3 +1,4 @@
+# Production docker-compose using GitHub Container Registry images
 version: '3.8'
 
 services:
@@ -8,17 +9,18 @@ services:
     environment:
       - POSTGRES_DB=flexfit
       - POSTGRES_USER=flexfit
-      - POSTGRES_PASSWORD=flexfit123
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-flexfit123}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - flexfit-network
+    restart: unless-stopped
 
   # Eureka Service Registry
   service-registry:
-    build: ./server/service-registry
+    image: ghcr.io/aet-devops25/team-code-compass/service-registry:${IMAGE_TAG:-latest}
     container_name: flexfit-service-registry
     ports:
       - "8761:8761"
@@ -29,10 +31,11 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    restart: unless-stopped
 
   # API Gateway
   api-gateway:
-    build: ./server/api-gateway
+    image: ghcr.io/aet-devops25/team-code-compass/api-gateway:${IMAGE_TAG:-latest}
     container_name: flexfit-api-gateway
     ports:
       - "8080:8000"
@@ -47,10 +50,11 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    restart: unless-stopped
 
   # User Service
   user-service:
-    build: ./server/user-service
+    image: ghcr.io/aet-devops25/team-code-compass/user-service:${IMAGE_TAG:-latest}
     container_name: flexfit-user-service
     depends_on:
       - db
@@ -60,17 +64,18 @@ services:
     environment:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/flexfit
       - SPRING_DATASOURCE_USERNAME=flexfit
-      - SPRING_DATASOURCE_PASSWORD=flexfit123
+      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD:-flexfit123}
       - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://service-registry:8761/eureka
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8081/actuator/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+    restart: unless-stopped
 
   # Workout Plan Service
   workout-plan-service:
-    build: ./server/workout-plan-service
+    image: ghcr.io/aet-devops25/team-code-compass/workout-plan-service:${IMAGE_TAG:-latest}
     container_name: flexfit-workout-plan-service
     depends_on:
       - db
@@ -81,63 +86,60 @@ services:
       - SPRING_PROFILES_ACTIVE=docker
       - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/flexfit
       - SPRING_DATASOURCE_USERNAME=flexfit
-      - SPRING_DATASOURCE_PASSWORD=flexfit123
+      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD:-flexfit123}
       - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://service-registry:8761/eureka
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8082/actuator/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+    restart: unless-stopped
 
   # GenAI Workout Worker (Cloud - Open WebUI)
   genai-workout-worker:
-    build: ./genai
+    image: ghcr.io/aet-devops25/team-code-compass/genai-worker:${IMAGE_TAG:-latest}
     container_name: flexfit-genai-worker
     ports:
       - "8083:8000"
     networks:
       - flexfit-network
     environment:
-      # Open WebUI Configuration
-      - OPEN_WEBUI_BASE_URL=https://gpu.aet.cit.tum.de
+      - OPEN_WEBUI_BASE_URL=${OPEN_WEBUI_BASE_URL:-https://gpu.aet.cit.tum.de}
       - CHAIR_API_KEY=${CHAIR_API_KEY}
-      - MODEL_NAME=${MODEL_NAME}
-      # - MOCK_MODE=true  # Enable for faster testing
+      - MODEL_NAME=${MODEL_NAME:-llama3.3:latest}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+    restart: unless-stopped
 
   # GenAI Workout Worker (Local - GPT4All/Ollama)
   genai-workout-worker-local:
-    build: 
-      context: ./genai
-      dockerfile: Dockerfile.local
+    image: ghcr.io/aet-devops25/team-code-compass/genai-worker-local:${IMAGE_TAG:-latest}
     container_name: flexfit-genai-worker-local
     ports:
       - "8084:8084"
     networks:
       - flexfit-network
     environment:
-      # Local AI Configuration
-      - LOCAL_MODEL_TYPE=mock  # mock, gpt4all, ollama
-      - OLLAMA_BASE_URL=http://localhost:11434
-      - OLLAMA_MODEL=llama2
-      - GPT4ALL_MODEL_PATH=/app/models/ggml-gpt4all-j-v1.3-groovy.bin
-      - MOCK_MODE=true  # Enable for development without actual models
+      - LOCAL_MODEL_TYPE=${LOCAL_MODEL_TYPE:-mock}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://localhost:11434}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama2}
+      - GPT4ALL_MODEL_PATH=${GPT4ALL_MODEL_PATH:-/app/models/ggml-gpt4all-j-v1.3-groovy.bin}
+      - MOCK_MODE=${MOCK_MODE:-true}
     volumes:
-      # Mount for local model storage (optional)
-      - ./genai/models:/app/models:ro
+      - genai_models:/app/models:ro
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8084/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+    restart: unless-stopped
 
-  # Next.js Frontend
+  # Frontend
   frontend:
-    build: ./client
+    image: ghcr.io/aet-devops25/team-code-compass/frontend:${IMAGE_TAG:-latest}
     container_name: flexfit-frontend
     ports:
       - "3000:80"
@@ -146,12 +148,73 @@ services:
     networks:
       - flexfit-network
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8080
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8080}
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+    restart: unless-stopped
+
+  # Prometheus monitoring
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: flexfit-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus:/etc/prometheus
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    networks:
+      - flexfit-network
+    depends_on:
+      - user-service
+      - workout-plan-service
+      - api-gateway
+
+  # Grafana dashboards
+  grafana:
+    image: grafana/grafana:latest
+    container_name: flexfit-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+    networks:
+      - flexfit-network
+    depends_on:
+      - prometheus
+
+  # Alertmanager for notifications
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: flexfit-alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./monitoring/alertmanager:/etc/alertmanager
+      - alertmanager_data:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+      - '--web.external-url=http://localhost:9093'
+    networks:
+      - flexfit-network
+    depends_on:
+      - prometheus
 
 networks:
   flexfit-network:
@@ -159,3 +222,7 @@ networks:
 
 volumes:
   postgres_data:
+  genai_models:
+  prometheus_data:
+  grafana_data:
+  alertmanager_data:

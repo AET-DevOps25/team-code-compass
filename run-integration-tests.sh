@@ -55,18 +55,18 @@ wait_for_services() {
     echo -e "\n${YELLOW}⏳ Waiting for services to be ready...${NC}"
     
     local services=(
-        "http://localhost:8080/actuator/health:API Gateway"
-        "http://localhost:8081/actuator/health:User Service"
-        "http://localhost:8082/actuator/health:Workout Plan Service"
-        "http://localhost:8083/health:GenAI Cloud Worker"
-        "http://localhost:8084/health:GenAI Local Worker"
+        "http://localhost:8080/actuator/health|API Gateway"
+        "http://localhost:8081/actuator/health|User Service"
+        "http://localhost:8082/actuator/health|Workout Plan Service"
+        "http://localhost:8083/health|GenAI Cloud Worker"
+        "http://localhost:8084/health|GenAI Local Worker"
     )
     
     local max_attempts=30
     local attempt=1
     
     for service in "${services[@]}"; do
-        IFS=':' read -ra ADDR <<< "$service"
+        IFS='|' read -ra ADDR <<< "$service"
         local url="${ADDR[0]}"
         local name="${ADDR[1]}"
         
@@ -290,6 +290,16 @@ main() {
     
     # Run tests if requested
     if [ "$run_tests" = true ]; then
+        # Always check service health before running tests
+        if [ "$start_services" = false ]; then
+            echo -e "\n${YELLOW}🏥 Checking if services are ready for testing...${NC}"
+            wait_for_services
+            if [ $? -ne 0 ]; then
+                echo -e "${RED}❌ Services are not ready for testing${NC}"
+                exit 1
+            fi
+        fi
+        
         run_integration_tests
         test_success=$?
     fi
