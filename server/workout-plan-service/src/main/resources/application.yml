@@ -48,12 +48,6 @@ eureka:
     prefer-ip-address: true
     hostname: localhost
 
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,metrics
-
 springdoc:
   api-docs:
     path: /v3/api-docs
