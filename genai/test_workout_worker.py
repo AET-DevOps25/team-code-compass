@@ -12,18 +12,27 @@ from unittest.mock import Mock, patch, MagicMock
 from fastapi.testclient import TestClient
 from datetime import datetime, timedelta
 
-# Import the application components
-from workout_worker import (
-    app,
-    OpenWebUILLM,
-    PromptContext,
-    WeeklyPromptContext,
-    GenAIExercise,
-    GenAIDailyWorkout,
-    GenAIWeeklyResponse,
-    generate_mock_response,
-    generate_mock_weekly_response
-)
+# Import the application components  
+import sys
+import os
+import importlib.util
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+# Import from workout-worker.py file (dash in filename)
+spec = importlib.util.spec_from_file_location("workout_worker", "workout-worker.py")
+workout_worker = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(workout_worker)
+
+# Import components
+app = workout_worker.app
+OpenWebUILLM = workout_worker.OpenWebUILLM
+PromptContext = workout_worker.PromptContext
+WeeklyPromptContext = workout_worker.WeeklyPromptContext
+GenAIExercise = workout_worker.GenAIExercise
+GenAIDailyWorkout = workout_worker.GenAIDailyWorkout
+GenAIWeeklyResponse = workout_worker.GenAIWeeklyResponse
+generate_mock_response = workout_worker.generate_mock_response
+generate_mock_weekly_response = workout_worker.generate_mock_weekly_response
 
 class TestGenAIExercise:
     """Test GenAI Exercise model"""
@@ -88,7 +97,8 @@ class TestPromptContext:
             user_profile={"age": 30, "gender": "MALE"},
             user_preferences={"experienceLevel": "INTERMEDIATE"},
             text_prompt="Upper body workout",
-            focus_sport_type="STRENGTH"
+            focus_sport_type="STRENGTH",
+            daily_focus="Upper body strength training"
         )
         
         assert context.user_profile["age"] == 30
@@ -122,7 +132,8 @@ class TestMockGeneration:
             user_profile={"age": 30, "gender": "MALE"},
             user_preferences={"experienceLevel": "INTERMEDIATE"},
             text_prompt="Test workout",
-            focus_sport_type="STRENGTH"
+            focus_sport_type="STRENGTH",
+            daily_focus="Strength training session"
         )
         
         response = generate_mock_response(context)
@@ -168,7 +179,8 @@ class TestMockGeneration:
             user_profile={"age": 35, "gender": "MALE"},
             user_preferences={"experienceLevel": "ADVANCED"},
             text_prompt="Strength training",
-            focus_sport_type="STRENGTH"
+            focus_sport_type="STRENGTH",
+            daily_focus="Advanced strength training"
         )
         
         # Generate multiple mock responses
@@ -187,7 +199,7 @@ class TestOpenWebUILLM:
         llm = OpenWebUILLM()
         assert hasattr(llm, '_call')
         assert hasattr(llm, '_llm_type')
-        assert llm._llm_type == "openwebui"
+        assert llm._llm_type == "open_webui"
     
     @patch.dict(os.environ, {'MOCK_MODE': 'true'})
     def test_llm_mock_mode(self):

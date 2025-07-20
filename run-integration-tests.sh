@@ -39,11 +39,11 @@ start_services() {
     echo -e "\n${YELLOW}🚀 Starting all services...${NC}"
     
     # Start services with Docker Compose
-    echo "Starting services with docker-compose..."
-    docker-compose -f "$DOCKER_COMPOSE_FILE" up -d --build
+    echo "Starting services with docker compose..."
+    docker compose -f "$DOCKER_COMPOSE_FILE" up -d --build
     
     if [ $? -ne 0 ]; then
-        echo -e "${RED}❌ Failed to start services with docker-compose${NC}"
+        echo -e "${RED}❌ Failed to start services with docker compose${NC}"
         exit 1
     fi
     
@@ -172,7 +172,7 @@ run_integration_tests() {
 stop_services() {
     echo -e "\n${YELLOW}🛑 Stopping services...${NC}"
     
-    docker-compose -f "$DOCKER_COMPOSE_FILE" down
+    docker compose -f "$DOCKER_COMPOSE_FILE" down
     
     if [ $? -eq 0 ]; then
         echo -e "${GREEN}✅ Services stopped successfully${NC}"

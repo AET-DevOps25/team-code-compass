@@ -1,0 +1,41 @@
+{{- if .Values.monitoring.alertmanager.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "flexfit.fullname" . }}-alertmanager
+  labels:
+    {{- include "flexfit.labels" . | nindent 4 }}
+    app.kubernetes.io/component: alertmanager
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "flexfit.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: alertmanager
+  template:
+    metadata:
+      labels:
+        {{- include "flexfit.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: alertmanager
+    spec:
+      containers:
+      - name: alertmanager
+        image: "{{ .Values.monitoring.alertmanager.image.repository }}:{{ .Values.monitoring.alertmanager.image.tag }}"
+        imagePullPolicy: {{ .Values.monitoring.alertmanager.image.pullPolicy | default "IfNotPresent" }}
+        ports:
+        - name: http
+          containerPort: 9093
+          protocol: TCP
+        args:
+        - '--config.file=/etc/alertmanager/alertmanager.yml'
+        - '--storage.path=/alertmanager'
+        - '--web.external-url=http://localhost:9093'
+        volumeMounts:
+        - name: alertmanager-storage
+          mountPath: /alertmanager
+        resources:
+          {{- toYaml (.Values.monitoring.alertmanager.resources | default .Values.resources) | nindent 10 }}
+      volumes:
+      - name: alertmanager-storage
+        emptyDir: {}
+{{- end }} 

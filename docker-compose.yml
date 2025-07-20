@@ -31,6 +31,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 60s
     restart: unless-stopped
 
   # API Gateway
@@ -50,6 +51,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 60s
     restart: unless-stopped
 
   # User Service
@@ -62,15 +64,16 @@ services:
     networks:
       - flexfit-network
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/flexfit
-      - SPRING_DATASOURCE_USERNAME=flexfit
-      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD:-flexfit123}
+      - SPRING_DATASOURCE_URL=${POSTGRES_URL:-jdbc:postgresql://db:5432/flexfit}
+      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER:-flexfit}
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:-flexfit123}
       - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://service-registry:8761/eureka
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8081/actuator/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 60s
     restart: unless-stopped
 
   # Workout Plan Service
@@ -84,15 +87,16 @@ services:
       - flexfit-network
     environment:
       - SPRING_PROFILES_ACTIVE=docker
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/flexfit
-      - SPRING_DATASOURCE_USERNAME=flexfit
-      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD:-flexfit123}
+      - SPRING_DATASOURCE_URL=${POSTGRES_URL:-jdbc:postgresql://db:5432/flexfit}
+      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER:-flexfit}
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:-flexfit123}
       - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://service-registry:8761/eureka
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8082/actuator/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 60s
     restart: unless-stopped
 
   # GenAI Workout Worker (Cloud - Open WebUI)

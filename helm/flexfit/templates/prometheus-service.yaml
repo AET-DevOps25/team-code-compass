@@ -1,0 +1,19 @@
+{{- if .Values.monitoring.prometheus.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "flexfit.fullname" . }}-prometheus
+  labels:
+    {{- include "flexfit.labels" . | nindent 4 }}
+    app.kubernetes.io/component: prometheus
+spec:
+  type: {{ .Values.monitoring.prometheus.service.type | default "ClusterIP" }}
+  ports:
+    - port: {{ .Values.monitoring.prometheus.service.port | default 9090 }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "flexfit.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: prometheus
+{{- end }} 
