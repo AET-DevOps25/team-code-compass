@@ -20,8 +20,51 @@ The FlexFit platform follows a **Master-Worker microservices pattern** with **Se
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Docker & Docker Compose (V2 - uses `docker compose`, not `docker-compose`)
-- Git
+
+- Docker and Docker Compose
+- Node.js 18+ (for local development)
+- Java 17+ (for backend services)
+- PostgreSQL (provided via Docker)
+
+### Environment Setup
+
+1. **Copy environment file:**
+   ```bash
+   cp env.example .env
+   ```
+
+2. **Configure Google Cloud TTS Credentials:**
+   
+   The TTS service requires Google Cloud credentials. You have two options:
+
+   **Option A: Using Environment Variable (Recommended)**
+   ```bash
+   # Encode your Google Cloud service account JSON
+   cat essential-graph-466415-k8-3ff55f48c0cc.json | base64 -w 0
+   
+   # Add the encoded string to your .env file
+   echo "GOOGLE_APPLICATION_CREDENTIALS_JSON=your_encoded_credentials_here" >> .env
+   ```
+
+   **Option B: Using Local File (Development Only)**
+   ```bash
+   # Copy the credentials file to server/tts-service/
+   cp essential-graph-466415-k8-3ff55f48c0cc.json server/tts-service/google-credentials.json
+   ```
+
+   **Option C: Using Setup Script (Easiest)**
+   ```bash
+   # Place your credentials file in server/tts-service/google-credentials.json
+   # Then run the setup script
+   ./setup-credentials.sh
+   ```
+
+3. **Configure other environment variables:**
+   - Set `JWT_SECRET` to a secure random string
+   - Set `CHAIR_API_KEY` for GenAI features
+   - Configure database credentials if needed
+
+### Running the Application
 
 ### 📝 Important: Docker Command Syntax
 ```bash

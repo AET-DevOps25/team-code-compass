@@ -219,10 +219,29 @@ The following secrets must be configured in GitHub repository settings:
 
 ```bash
 # Google Cloud credentials (base64 encode)
-cat google-service-account.json | base64 -w 0
+cat essential-graph-466415-k8-3ff55f48c0cc.json | base64 -w 0
 
 # Add to GitHub repository secrets:
 # Settings > Secrets and variables > Actions > New repository secret
+```
+
+### Local Development Setup
+
+For local development, you can use either:
+
+**Option A: Environment Variable (Recommended)**
+```bash
+# Encode credentials
+cat essential-graph-466415-k8-3ff55f48c0cc.json | base64 -w 0
+
+# Add to .env file
+echo "GOOGLE_APPLICATION_CREDENTIALS_JSON=your_encoded_credentials_here" >> .env
+```
+
+**Option B: Local File**
+```bash
+# Copy credentials to TTS service directory
+cp essential-graph-466415-k8-3ff55f48c0cc.json server/tts-service/google-credentials.json
 ```
 
 ## 🚀 Deployment Process
@@ -373,27 +392,3 @@ helm rollback flexfit 1 -n flexfit
 # Rollback to specific version
 helm rollback flexfit <revision> -n flexfit
 ```
-
-### Emergency Rollback
-
-```bash
-# Delete deployment
-kubectl delete deployment flexfit-tts-service -n flexfit
-
-# Recreate from previous image
-kubectl apply -f helm/flexfit/templates/tts-service-deployment.yaml
-```
-
-## 📝 Summary
-
-The TTS service is now fully integrated into the CI/CD pipeline with:
-
-- ✅ **Automated Docker image building and pushing**
-- ✅ **Kubernetes deployment via Helm**
-- ✅ **Health monitoring and probes**
-- ✅ **Secrets management for Google Cloud credentials**
-- ✅ **Service discovery integration**
-- ✅ **Rollback capabilities**
-- ✅ **Comprehensive monitoring and logging**
-
-The deployment process is fully automated and will trigger on every push to the main branch, ensuring continuous delivery of the FlexFit application including the TTS service. 

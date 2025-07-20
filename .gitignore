@@ -412,3 +412,8 @@ sketch
 !vite.config.ts
 !astro.config.ts
 !svelte.config.ts
+
+# Specific Google Cloud credentials files
+essential-graph-466415-k8-3ff55f48c0cc.json
+google-credentials.json
+google-service-account.json

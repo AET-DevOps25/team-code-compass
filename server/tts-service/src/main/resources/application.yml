@@ -56,7 +56,7 @@ springdoc:
 google:
   cloud:
     tts:
-      credentials-path: ${GOOGLE_APPLICATION_CREDENTIALS_JSON}
+      credentials-path: ${GOOGLE_APPLICATION_CREDENTIALS_PATH:}
       voice-name: ${TTS_VOICE_NAME:en-US-Neural2-F}
       language-code: ${TTS_LANGUAGE_CODE:en-US}
       audio-encoding: ${TTS_AUDIO_ENCODING:MP3} 
