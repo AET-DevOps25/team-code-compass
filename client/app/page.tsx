@@ -39,6 +39,7 @@ import { useAuth } from "../src/hooks/useAuth"
 import { Gender } from "../src/types/user"
 import { workoutService } from "../src/services/workoutService"
 import { SportType as WorkoutServiceSportType } from "../src/types/workout"
+import { formatDateForAPI, getTodayLocalDate } from "../src/utils/dateUtils"
 
 // Types and Enums
 enum FitnessGoal {
@@ -188,8 +189,8 @@ export default function FlexFitApp() {
       const endDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0)
       
       const response = await workoutService.getMyWorkoutsByDateRange({
-        startDate: startDate.toISOString().split('T')[0],
-        endDate: endDate.toISOString().split('T')[0]
+        startDate: formatDateForAPI(startDate),
+        endDate: formatDateForAPI(endDate)
       }, user.id)
 
       if (response.error) {
@@ -292,7 +293,7 @@ export default function FlexFitApp() {
 
   useEffect(() => {
     // Load workout for selected date with proper error handling
-    const dateKey = selectedDate.toISOString().split("T")[0]
+    const dateKey = formatDateForAPI(selectedDate)
     const workout = workoutSessions[dateKey] || null
     setCurrentWorkout(workout)
 
@@ -301,7 +302,7 @@ export default function FlexFitApp() {
   }, [selectedDate, workoutSessions])
 
   const getDateStatus = (date: Date): WorkoutStatus => {
-    const dateKey = date.toISOString().split("T")[0]
+    const dateKey = formatDateForAPI(date)
     const workout = workoutSessions[dateKey]
     return workout?.status || WorkoutStatus.NONE
   }
@@ -419,11 +420,15 @@ export default function FlexFitApp() {
     setGenerationStatus(null)
 
     try {
+      // Map frontend LLM preference to backend AI preference
+      const aiPreference = llmPreference === 'cloud' ? 'cloud' : 'local'
+      
       const requestBody = {
         userId: user.id,
-        dayDate: new Date().toISOString().split('T')[0],
+        dayDate: getTodayLocalDate(),
         focusSportType: mapWorkoutTypeToSportType(userPreferences.preferredWorkouts[0]),
         targetDurationMinutes: userPreferences.workoutDuration,
+        aiPreference: aiPreference,
         ...(customPrompt.trim() && { textPrompt: customPrompt.trim() })
       }
 
@@ -475,11 +480,15 @@ export default function FlexFitApp() {
     setGenerationStatus(null)
 
     try {
+      // Map frontend LLM preference to backend AI preference
+      const aiPreference = llmPreference === 'cloud' ? 'cloud' : 'local'
+      
       const requestBody = {
         userId: user.id,
-        dayDate: new Date().toISOString().split('T')[0],
+        dayDate: getTodayLocalDate(),
         focusSportType: mapWorkoutTypeToSportType(userPreferences.preferredWorkouts[0]),
         targetDurationMinutes: userPreferences.workoutDuration,
+        aiPreference: aiPreference,
         ...(customPrompt.trim() && { textPrompt: customPrompt.trim() })
       }
 
@@ -634,7 +643,7 @@ export default function FlexFitApp() {
         const progressMessage: ChatMessage = {
           id: (Date.now() + i + 100).toString(),
           role: "assistant",
-          content: `⏳ Generating ${dayPlan.isRest ? 'rest day plan' : dayPlan.sportType + ' workout'} for ${dayName} (${currentDate.toISOString().split('T')[0]})...`,
+          content: `⏳ Generating ${dayPlan.isRest ? 'rest day plan' : dayPlan.sportType + ' workout'} for ${dayName} (${formatDateForAPI(currentDate)})...`,
           timestamp: new Date()
         }
         setChatMessages(prev => [...prev, progressMessage])
@@ -654,9 +663,12 @@ export default function FlexFitApp() {
           enhancedPrompt += (enhancedPrompt ? ' | ' : '') + 'This is a REST day - create light recovery activities, stretching, or complete rest'
         }
 
+        // Map frontend LLM preference to backend AI preference
+        const aiPreference = llmPreference === 'cloud' ? 'cloud' : 'local'
+        
         const requestBody = {
           userId: user.id,
-          dayDate: currentDate.toISOString().split('T')[0],
+          dayDate: formatDateForAPI(currentDate),
           focusSportType: dayPlan.isRest ? WorkoutServiceSportType.REST : 
             (dayPlan.sportType === 'STRENGTH' ? WorkoutServiceSportType.STRENGTH :
              dayPlan.sportType === 'HIIT' ? WorkoutServiceSportType.HIIT :
@@ -664,6 +676,7 @@ export default function FlexFitApp() {
              dayPlan.sportType === 'RUNNING_INTERVALS' ? WorkoutServiceSportType.RUNNING_INTERVALS :
              WorkoutServiceSportType.STRENGTH),
           targetDurationMinutes: dayPlan.isRest ? 15 : userPreferences.workoutDuration,
+          aiPreference: aiPreference,
           ...(enhancedPrompt && { textPrompt: enhancedPrompt })
         }
 
@@ -1066,10 +1079,14 @@ export default function FlexFitApp() {
         workoutDate.setDate(today.getDate() + i)
         
         try {
+          // Map frontend LLM preference to backend AI preference
+          const aiPreference = llmPreference === 'cloud' ? 'cloud' : 'local'
+          
           const response = await workoutService.generateWorkoutPlan({
             sportType,
             targetDurationMinutes: duration,
-            date: workoutDate.toISOString().split('T')[0]
+            date: formatDateForAPI(workoutDate),
+            aiPreference: aiPreference
           }, user.id)
 
           if (response.data) {
@@ -1142,9 +1159,9 @@ export default function FlexFitApp() {
       await refreshWorkouts()
 
       // Update current workout if we generated one for today
-      const todayString = today.toISOString().split('T')[0]
+      const todayString = getTodayLocalDate()
       const todayWorkout = generatedWorkouts.find(w => 
-        new Date(w.workout.dayDate).toISOString().split('T')[0] === todayString
+        w.workout.dayDate === todayString
       )
       if (todayWorkout) {
         setCurrentWorkout({
@@ -1576,6 +1593,36 @@ export default function FlexFitApp() {
                 </h1>
               </div>
               <div className="flex items-center space-x-4">
+                {/* AI Model Preference Selector */}
+                <div className="flex items-center space-x-2">
+                  <Zap className="h-4 w-4 text-purple-600" />
+                  <Select value={llmPreference} onValueChange={(value: 'cloud' | 'local_ollama' | 'local_gpt4all') => setLlmPreference(value)}>
+                    <SelectTrigger className="w-40 h-8 text-xs bg-white/80">
+                      <SelectValue placeholder="AI Model" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="cloud">
+                        <div className="flex items-center space-x-2">
+                          <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                          <span>Cloud AI</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="local_ollama">
+                        <div className="flex items-center space-x-2">
+                          <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                          <span>Local (Ollama)</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="local_gpt4all">
+                        <div className="flex items-center space-x-2">
+                          <div className="w-2 h-2 rounded-full bg-orange-500"></div>
+                          <span>Local (GPT4All)</span>
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
                 <Avatar>
                   <AvatarImage src="/placeholder.svg?height=32&width=32" />
                   <AvatarFallback>
@@ -1657,7 +1704,7 @@ export default function FlexFitApp() {
                     <div className="grid grid-cols-7 gap-1">
                       {calendarDays.map((date, index) => {
                         const status = getDateStatus(date)
-                        const workout = workoutSessions[date.toISOString().split("T")[0]]
+                        const workout = workoutSessions[formatDateForAPI(date)]
                         const isSelected = selectedDate?.toDateString() === date.toDateString()
                         const isCurrentMonth = date.getMonth() === currentMonth.getMonth()
                         const isToday = date.toDateString() === new Date().toDateString()
@@ -1853,9 +1900,7 @@ export default function FlexFitApp() {
                                 <h3 className="text-lg font-semibold text-gray-700 mb-3 mt-6">{children}</h3>
                               ),
                               table: ({ children }) => (
-                                <div className="overflow-x-auto my-6 shadow-sm rounded-lg border border-gray-200">
-                                  <table className="min-w-full bg-white divide-y divide-gray-200">{children}</table>
-                                </div>
+                                <div className="overflow-x-auto my-6 shadow-sm rounded-lg border border-gray-200">{children}</div>
                               ),
                               th: ({ children }) => (
                                 <th className="px-6 py-3 bg-gradient-to-r from-gray-50 to-gray-100 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-b border-gray-200">

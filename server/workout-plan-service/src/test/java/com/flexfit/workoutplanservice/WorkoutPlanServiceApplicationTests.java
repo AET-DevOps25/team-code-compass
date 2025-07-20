@@ -17,7 +17,8 @@ import org.springframework.test.context.TestPropertySource;
     "eureka.client.enabled=false",
     "spring.cloud.discovery.enabled=false",
     "flexfit.services.user-service.url=http://localhost:8081",
-    "flexfit.services.genai-service.url=http://localhost:8083"
+    "flexfit.services.genai-service.cloud.url=http://localhost:8083",
+    "flexfit.services.genai-service.local.url=http://localhost:8084"
 })
 class WorkoutPlanServiceApplicationTests {
 

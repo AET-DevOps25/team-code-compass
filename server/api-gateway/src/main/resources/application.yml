@@ -38,7 +38,7 @@ spring:
           filters:
             - RewritePath=/workout-plan-service/(?<segment>.*), /${segment}
 
-        # Direct Swagger UI access for user service
+        # Swagger UI for user service - with proper configuration
         - id: user-service-swagger-ui
           uri: lb://user-service
           predicates:
@@ -46,7 +46,7 @@ spring:
           filters:
             - StripPrefix=1
 
-        # Direct Swagger UI access for workout plan service
+        # Swagger UI for workout plan service - with proper configuration  
         - id: workout-plan-service-swagger-ui
           uri: lb://workout-plan-service
           predicates:
@@ -54,7 +54,7 @@ spring:
           filters:
             - StripPrefix=1
 
-        # API docs for user service
+        # API docs for user service - with proper path handling
         - id: user-service-v3-api-docs
           uri: lb://user-service
           predicates:
@@ -62,11 +62,26 @@ spring:
           filters:
             - StripPrefix=1
 
-        # API docs for workout plan service
+        # API docs for workout plan service - with proper path handling
         - id: workout-plan-service-v3-api-docs
           uri: lb://workout-plan-service
           predicates:
             - Path=/workout-plan-service/v3/api-docs/**
+          filters:
+            - StripPrefix=1
+
+        # Webjars support for Swagger UI assets
+        - id: user-service-webjars
+          uri: lb://user-service
+          predicates:
+            - Path=/user-service/webjars/**
+          filters:
+            - StripPrefix=1
+
+        - id: workout-plan-service-webjars
+          uri: lb://workout-plan-service
+          predicates:
+            - Path=/workout-plan-service/webjars/**
           filters:
             - StripPrefix=1
 
@@ -133,4 +148,17 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,gateway 
+        include: health,info,gateway,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+    metrics:
+      enabled: true
+    prometheus:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    tags:
+      application: ${spring.application.name} 

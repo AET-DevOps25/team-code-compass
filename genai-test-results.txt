@@ -1,0 +1,6 @@
+[0;34m======================================[0m
+[0;34m    FlexFit GenAI Worker Test Suite   [0m
+[0;34m======================================[0m
+
+[1;33mTest 1: GenAI Worker Health Check[0m
+[0;32m[PASS][0m GenAI worker is healthy

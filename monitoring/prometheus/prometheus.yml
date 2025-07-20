@@ -1,0 +1,68 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - "alert_rules.yml"
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - "flexfit-alertmanager:9093"
+
+scrape_configs:
+  # API Gateway metrics
+  - job_name: 'api-gateway'
+    static_configs:
+      - targets: ['api-gateway:8000']
+    metrics_path: '/actuator/prometheus'
+    scrape_interval: 5s
+    scrape_timeout: 5s
+
+  # User Service metrics
+  - job_name: 'user-service'
+    static_configs:
+      - targets: ['user-service:8081']
+    metrics_path: '/actuator/prometheus'
+    scrape_interval: 5s
+    scrape_timeout: 5s
+
+  # Workout Plan Service metrics
+  - job_name: 'workout-plan-service'
+    static_configs:
+      - targets: ['workout-plan-service:8082']
+    metrics_path: '/actuator/prometheus'
+    scrape_interval: 5s
+    scrape_timeout: 5s
+
+  # Cloud GenAI Worker metrics
+  - job_name: 'genai-worker-cloud'
+    static_configs:
+      - targets: ['genai-workout-worker:8083']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+    scrape_timeout: 5s
+
+  # Local GenAI Worker metrics  
+  - job_name: 'genai-worker-local'
+    static_configs:
+      - targets: ['genai-worker-local:8084']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+    scrape_timeout: 5s
+
+  # Service Registry metrics
+  - job_name: 'service-registry'
+    static_configs:
+      - targets: ['service-registry:8761']
+    metrics_path: '/actuator/prometheus'
+    scrape_interval: 15s
+    scrape_timeout: 5s
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    scrape_interval: 5s
+    scrape_timeout: 5s 

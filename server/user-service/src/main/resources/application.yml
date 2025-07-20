@@ -54,10 +54,15 @@ springdoc:
     enabled: true
   swagger-ui:
     path: /swagger-ui.html
-    disable-swagger-default-url: true
-    config-url: /v3/api-docs/swagger-config
-    url: /v3/api-docs
+    disable-swagger-default-url: false
     try-it-out-enabled: true
     filter: true
+    # Enable CSRF for gateway support
+    csrf:
+      enabled: false
   show-actuator: false
-  use-fqn: true 
+  use-fqn: true
+  # Enable gateway support
+  use-management-port: false
+  cache:
+    disabled: true 
