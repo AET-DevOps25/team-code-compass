@@ -32,7 +32,6 @@ import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.flexfit.workoutplanservice.model.enums.CompletionStatus;
 
 @Service
 @RequiredArgsConstructor
@@ -135,48 +134,7 @@ public class WorkoutPlanService {
             "target_total_duration_minutes", request.getTargetDurationMinutes()
         );
 
-        // Fetch last 7 days' workouts for better context
-        List<Map<String, Object>> last7DaysExercises = getLast7DaysExercises(request.getUserId(), request.getDayDate());
-        
-        // Include textPrompt from request
-        String textPrompt = request.getTextPrompt() != null ? request.getTextPrompt() : "";
-
-        return new PromptContext(userProfileMap, user.preferences(), dailyFocusMap, last7DaysExercises, textPrompt);
-    }
-    
-    private List<Map<String, Object>> getLast7DaysExercises(UUID userId, LocalDate currentDate) {
-        // Get workouts from 7 days ago up to yesterday (excluding today)
-        LocalDate startDate = currentDate.minusDays(7);
-        LocalDate endDate = currentDate.minusDays(1);
-        
-        List<DailyWorkout> recentWorkouts = dailyWorkoutRepository.findByUserIdAndDayDateBetween(
-            userId, startDate, endDate);
-        
-        return recentWorkouts.stream()
-            .map(workout -> {
-                List<Map<String, Object>> exercises = workout.getScheduledExercises().stream()
-                    .map(exercise -> Map.of(
-                        "exercise_name", exercise.getExerciseName(),
-                        "sport_type", exercise.getApplicableSportTypes().isEmpty() ? 
-                            "UNKNOWN" : exercise.getApplicableSportTypes().get(0).toString(),
-                        "muscle_groups", exercise.getMuscleGroupsPrimary(),
-                        "equipment", exercise.getEquipmentNeeded().stream()
-                            .map(Enum::toString)
-                            .collect(Collectors.toList()),
-                        "difficulty", exercise.getDifficulty(),
-                        "sets_reps", exercise.getPrescribedSetsRepsDuration()
-                    ))
-                    .collect(Collectors.toList());
-                
-                return Map.of(
-                    "date", workout.getDayDate().toString(),
-                    "sport_type", workout.getFocusSportTypeForTheDay().toString(),
-                    "completion_status", workout.getCompletionStatus() != null ? 
-                        workout.getCompletionStatus().toString() : "PENDING",
-                    "exercises", exercises
-                );
-            })
-            .collect(Collectors.toList());
+        return new PromptContext(userProfileMap, user.preferences(), dailyFocusMap);
     }
     
     private GenAIResponse callGenAIWorker(PromptContext context, String bearerToken) {
@@ -201,8 +159,7 @@ public class WorkoutPlanService {
         DailyWorkout dailyWorkout = new DailyWorkout();
         dailyWorkout.setUserId(request.getUserId());
         dailyWorkout.setDayDate(request.getDayDate());
-        // Use sport type from AI response (like weekly method) instead of request to properly handle REST
-        dailyWorkout.setFocusSportTypeForTheDay(parseSportType(aiWorkout.focus_sport_type_for_the_day()));
+        dailyWorkout.setFocusSportTypeForTheDay(request.getFocusSportType());
         dailyWorkout.setMarkdownContent(aiWorkout.markdown_content());
         
         List<ScheduledExercise> exercises = aiWorkout.scheduled_exercises().stream().map(aiExercise -> {
@@ -356,52 +313,5 @@ public class WorkoutPlanService {
         }
 
         return savedWorkouts;
-    }
-    
-    @Transactional
-    public Optional<DailyWorkoutResponse> completeWorkout(UUID workoutId) {
-        Optional<DailyWorkout> workoutOptional = dailyWorkoutRepository.findById(workoutId);
-        
-        if (workoutOptional.isPresent()) {
-            DailyWorkout workout = workoutOptional.get();
-            workout.setCompletionStatus(CompletionStatus.COMPLETED);
-            
-            // Also mark all exercises in this workout as completed
-            workout.getScheduledExercises().forEach(exercise -> {
-                if (exercise.getCompletionStatus() != CompletionStatus.COMPLETED) {
-                    exercise.setCompletionStatus(CompletionStatus.COMPLETED);
-                }
-            });
-            
-            DailyWorkout savedWorkout = dailyWorkoutRepository.save(workout);
-            return Optional.of(mapper.toDailyWorkoutResponse(savedWorkout));
-        }
-        
-        return Optional.empty();
-    }
-    
-    @Transactional
-    public boolean completeExercise(UUID exerciseId) {
-        Optional<ScheduledExercise> exerciseOptional = scheduledExerciseRepository.findById(exerciseId);
-        
-        if (exerciseOptional.isPresent()) {
-            ScheduledExercise exercise = exerciseOptional.get();
-            exercise.setCompletionStatus(CompletionStatus.COMPLETED);
-            scheduledExerciseRepository.save(exercise);
-            
-            // Check if all exercises in the workout are completed and update workout status
-            DailyWorkout workout = exercise.getDailyWorkout();
-            boolean allExercisesCompleted = workout.getScheduledExercises().stream()
-                .allMatch(ex -> ex.getCompletionStatus() == CompletionStatus.COMPLETED);
-            
-            if (allExercisesCompleted && workout.getCompletionStatus() != CompletionStatus.COMPLETED) {
-                workout.setCompletionStatus(CompletionStatus.COMPLETED);
-                dailyWorkoutRepository.save(workout);
-            }
-            
-            return true;
-        }
-        
-        return false;
     }
 }

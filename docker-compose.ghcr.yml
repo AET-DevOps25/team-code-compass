@@ -95,6 +95,25 @@ services:
       retries: 3
     restart: unless-stopped
 
+  # TTS Service
+  tts-service:
+    image: ghcr.io/aet-devops25/team-code-compass/tts-service:${IMAGE_TAG:-latest}
+    container_name: flexfit-tts-service
+    ports:
+      - "8083:8083"
+    depends_on:
+      - service-registry
+    networks:
+      - flexfit-network
+    environment:
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://service-registry:8761/eureka
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/api/tts/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
   # GenAI Workout Worker
   genai-workout-worker:
     image: ghcr.io/aet-devops25/team-code-compass/genai-worker:${IMAGE_TAG:-latest}

@@ -34,11 +34,11 @@ import {
   Moon,
 } from "lucide-react"
 import ReactMarkdown from "react-markdown"
-import remarkGfm from "remark-gfm"
 import { useAuth } from "../src/hooks/useAuth"
 import { Gender } from "../src/types/user"
 import { workoutService } from "../src/services/workoutService"
 import { SportType as WorkoutServiceSportType } from "../src/types/workout"
+import { useTts } from "../src/hooks/useTts"
 
 // Types and Enums
 enum FitnessGoal {
@@ -66,7 +66,6 @@ enum WorkoutType {
   CROSSFIT = "CrossFit",
   SWIMMING = "Swimming",
   RUNNING = "Running",
-  REST = "Rest Day",
 }
 
 enum Equipment {
@@ -76,7 +75,12 @@ enum Equipment {
   FULL_GYM = "Full Gym Access",
 }
 
-
+enum TimePreference {
+  MORNING = "Morning (6-10 AM)",
+  AFTERNOON = "Afternoon (12-4 PM)",
+  EVENING = "Evening (6-9 PM)",
+  FLEXIBLE = "Flexible",
+}
 
 enum IntensityLevel {
   LOW = "Low",
@@ -108,6 +112,7 @@ interface UserPreferences {
   experienceLevel: ExperienceLevel
   preferredWorkouts: WorkoutType[]
   equipment: Equipment
+  timePreference: TimePreference
   intensityLevel: IntensityLevel
   bodyFocus: BodyFocus
   age: number
@@ -146,6 +151,7 @@ export default function FlexFitApp() {
     experienceLevel: ExperienceLevel.BEGINNER,
     preferredWorkouts: [WorkoutType.STRENGTH, WorkoutType.CARDIO],
     equipment: Equipment.BASIC,
+    timePreference: TimePreference.EVENING,
     intensityLevel: IntensityLevel.MODERATE,
     bodyFocus: BodyFocus.FULL_BODY,
     age: 25,
@@ -166,14 +172,22 @@ export default function FlexFitApp() {
     message: string
   } | null>(null)
 
-  // NEW: LLM Selection State
-  const [llmPreference, setLlmPreference] = useState<'cloud' | 'local_ollama' | 'local_gpt4all'>('cloud')
-  const [availableCapabilities, setAvailableCapabilities] = useState<{
-    llm_types: string[];
-    rag_enabled: boolean;
-    vector_databases: string[];
-  } | null>(null)
-  const [isLoadingCapabilities, setIsLoadingCapabilities] = useState(false)
+  // TTS state
+  const {
+    isGenerating: isGeneratingAudio,
+    isSynthesizing,
+    error: ttsError,
+    audioUrl,
+    audioBlob,
+    availableVoices,
+    isLoadingVoices,
+    generateAudio,
+    synthesizeAudio,
+    loadAvailableVoices,
+    clearError: clearTtsError,
+    clearAudio
+  } = useTts()
+  const [selectedVoice, setSelectedVoice] = useState<string>('en-US-Neural2-F')
 
   // Function to load workouts from backend
   const loadWorkouts = useCallback(async () => {
@@ -206,8 +220,7 @@ export default function FlexFitApp() {
           'STRENGTH': WorkoutType.STRENGTH,
           'HIIT': WorkoutType.HIIT,
           'YOGA_MOBILITY': WorkoutType.YOGA,
-          'RUNNING_INTERVALS': WorkoutType.RUNNING,
-          'REST': WorkoutType.REST
+          'RUNNING_INTERVALS': WorkoutType.RUNNING
         }
 
         const statusMap: Record<string, WorkoutStatus> = {
@@ -219,7 +232,7 @@ export default function FlexFitApp() {
 
         workoutMap[workout.dayDate] = {
           id: workout.id,
-          name: workout.focusSportTypeForTheDay === 'REST' ? 'Rest Day' : `${workout.focusSportTypeForTheDay.replace('_', ' ')} Training`,
+          name: `${workout.focusSportTypeForTheDay.replace('_', ' ')} Training`,
           type: sportTypeMap[workout.focusSportTypeForTheDay] || WorkoutType.STRENGTH,
           duration: workout.scheduledExercises?.reduce((total, exercise) => {
             const match = exercise.prescribedSetsRepsDuration.match(/(\d+)\s*(?:min|minute)/i)
@@ -227,7 +240,7 @@ export default function FlexFitApp() {
           }, 0) || 30,
           difficulty: IntensityLevel.MODERATE,
           equipment: Equipment.BASIC,
-          status: workout.focusSportTypeForTheDay === 'REST' ? WorkoutStatus.REST : (statusMap[workout.completionStatus] || WorkoutStatus.PLANNED),
+          status: statusMap[workout.completionStatus] || WorkoutStatus.PLANNED,
           content: workout.markdownContent || '',
           date: workout.dayDate
         }
@@ -253,8 +266,7 @@ export default function FlexFitApp() {
       'STRENGTH': WorkoutType.STRENGTH,
       'HIIT': WorkoutType.HIIT,
       'YOGA_MOBILITY': WorkoutType.YOGA,
-      'RUNNING_INTERVALS': WorkoutType.RUNNING,
-      'REST': WorkoutType.REST
+      'RUNNING_INTERVALS': WorkoutType.RUNNING
     }
 
     const newWorkoutSession: WorkoutSession = {
@@ -534,140 +546,44 @@ export default function FlexFitApp() {
     const initialMessage: ChatMessage = {
       id: Date.now().toString(),
       role: "assistant",
-      content: "🚀 Starting Smart Queue Weekly Plan generation! Fetching your recent workout history for better planning...",
+      content: "🚀 Starting Queue Weekly Plan generation! I'll create 7 workouts sequentially...",
       timestamp: new Date()
     }
     setChatMessages(prev => [...prev, initialMessage])
 
     try {
-      // Step 1: Fetch last week's workouts for context
-      let lastWeeksWorkouts: any[] = []
-      try {
-        const historyResponse = await workoutService.getLastWeeksWorkouts(user.id)
-        if (historyResponse.data) {
-          lastWeeksWorkouts = historyResponse.data || []
-          
-          const historyMessage: ChatMessage = {
-            id: (Date.now() + 1).toString(),
-            role: "assistant",
-            content: `📊 Found ${lastWeeksWorkouts.length} workouts from your recent history. This will help create a balanced weekly plan with proper rest days!`,
-            timestamp: new Date()
-          }
-          setChatMessages(prev => [...prev, historyMessage])
-        }
-      } catch (error) {
-        console.warn('Could not fetch workout history:', error)
-        const warningMessage: ChatMessage = {
-          id: (Date.now() + 2).toString(),
-          role: "assistant",
-          content: "⚠️ Couldn't fetch workout history, but continuing with generation...",
-          timestamp: new Date()
-        }
-        setChatMessages(prev => [...prev, warningMessage])
-      }
-
-      // Step 2: Create a smart weekly workout plan starting from TODAY
       const today = new Date()
       const startOfWeek = new Date(today)
-      // Start from today for the next 7 days
-      startOfWeek.setDate(today.getDate())
+      startOfWeek.setDate(today.getDate() - today.getDay()) // Sunday
 
       let successCount = 0
       let errorCount = 0
-      
-      // Generate day names starting from today
-      const dayNames = []
-      for (let i = 0; i < 7; i++) {
-        const date = new Date(startOfWeek)
-        date.setDate(startOfWeek.getDate() + i)
-        dayNames.push(date.toLocaleDateString('en-US', { weekday: 'long' }))
-      }
-      
-      // Create smart workout schedule based on user preferences
-      const createSmartWeeklyPlan = () => {
-        const workoutsPerWeek = userPreferences.workoutsPerWeek
-        const restDays = 7 - workoutsPerWeek
-        
-        // Base workout types from user preferences
-        const preferredWorkoutTypes = userPreferences.preferredWorkouts.slice(0, 3) // Get up to 3 preferred types
-        
-        const plan = []
-        let workoutCount = 0
-        
-        for (let i = 0; i < 7; i++) {
-          const dayName = dayNames[i]
-          
-          if (workoutCount < workoutsPerWeek) {
-            // Assign workout days
-            const workoutType = preferredWorkoutTypes[workoutCount % preferredWorkoutTypes.length] || WorkoutType.STRENGTH
-            const sportType = workoutType === WorkoutType.STRENGTH ? 'STRENGTH' : 
-                             workoutType === WorkoutType.HIIT ? 'HIIT' :
-                             workoutType === WorkoutType.YOGA ? 'YOGA_MOBILITY' :
-                             workoutType === WorkoutType.RUNNING ? 'RUNNING_INTERVALS' :
-                             workoutType === WorkoutType.CARDIO ? 'RUNNING_INTERVALS' :
-                             'STRENGTH'
-            plan.push({ 
-              day: dayName, 
-              sportType, 
-              isRest: false 
-            })
-            workoutCount++
-          } else {
-            // Assign rest days
-            plan.push({ day: dayName, sportType: 'REST', isRest: true })
-          }
-        }
-        
-        return plan
-      }
-      
-      const weeklyPlan = createSmartWeeklyPlan()
+      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
       // Generate workouts one by one sequentially
       for (let i = 0; i < 7; i++) {
         const currentDate = new Date(startOfWeek)
         currentDate.setDate(startOfWeek.getDate() + i)
         const dayName = dayNames[i]
-        const dayPlan = weeklyPlan[i]
         
-        // Add progress message to chat
-        const progressMessage: ChatMessage = {
-          id: (Date.now() + i + 100).toString(),
-          role: "assistant",
-          content: `⏳ Generating ${dayPlan.isRest ? 'rest day plan' : dayPlan.sportType + ' workout'} for ${dayName} (${currentDate.toISOString().split('T')[0]})...`,
-          timestamp: new Date()
-        }
-        setChatMessages(prev => [...prev, progressMessage])
-
-        // Build enhanced prompt with workout history context
-        let enhancedPrompt = customPrompt.trim()
-        if (lastWeeksWorkouts.length > 0) {
-          const recentExercises = lastWeeksWorkouts.flatMap(w => 
-            w.scheduledExercises?.map((e: any) => e.exerciseName) || []
-          ).join(', ')
-          
-          enhancedPrompt += enhancedPrompt ? ' | ' : ''
-          enhancedPrompt += `Consider recent workouts from last 7 days for variety and recovery. Recent exercises: ${recentExercises}`
-        }
-
-        if (dayPlan.isRest) {
-          enhancedPrompt += (enhancedPrompt ? ' | ' : '') + 'This is a REST day - create light recovery activities, stretching, or complete rest'
-        }
-
         const requestBody = {
           userId: user.id,
           dayDate: currentDate.toISOString().split('T')[0],
-          focusSportType: dayPlan.isRest ? WorkoutServiceSportType.REST : 
-            (dayPlan.sportType === 'STRENGTH' ? WorkoutServiceSportType.STRENGTH :
-             dayPlan.sportType === 'HIIT' ? WorkoutServiceSportType.HIIT :
-             dayPlan.sportType === 'YOGA_MOBILITY' ? WorkoutServiceSportType.YOGA_MOBILITY :
-             dayPlan.sportType === 'RUNNING_INTERVALS' ? WorkoutServiceSportType.RUNNING_INTERVALS :
-             WorkoutServiceSportType.STRENGTH),
-          targetDurationMinutes: dayPlan.isRest ? 15 : userPreferences.workoutDuration,
-          ...(enhancedPrompt && { textPrompt: enhancedPrompt })
+          focusSportType: mapWorkoutTypeToSportType(userPreferences.preferredWorkouts[0]),
+          targetDurationMinutes: userPreferences.workoutDuration,
+          ...(customPrompt.trim() && { textPrompt: customPrompt.trim() })
         }
 
-        console.log(`Generating workout for ${dayName}:`, requestBody)
+        console.log(`Generating workout for ${dayName} (${currentDate.toISOString().split('T')[0]}):`, requestBody)
+
+        // Add progress message to chat
+        const progressMessage: ChatMessage = {
+          id: (Date.now() + i).toString(),
+          role: "assistant",
+          content: `⏳ Generating workout for ${dayName} (${currentDate.toISOString().split('T')[0]})...`,
+          timestamp: new Date()
+        }
+        setChatMessages(prev => [...prev, progressMessage])
 
         try {
           const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/workout-plan-service/api/v1/plans/generate`, {
@@ -685,18 +601,11 @@ export default function FlexFitApp() {
             
             // Add success message to chat
             const successMessage: ChatMessage = {
-              id: (Date.now() + i + 1000).toString(),
+              id: Date.now() + i + 1000,
               role: "assistant",
-              content: `✅ ${dayName} ${dayPlan.isRest ? 'rest day' : 'workout'} generated! ${dayPlan.isRest ? 'Light recovery activities planned.' : `Created ${dayPlan.sportType} workout with ${workout.scheduledExercises?.length || 'several'} exercises.`}`,
-              timestamp: new Date()
+              content: `✅ ${dayName} workout generated successfully! Created "${workout.name || 'Workout'}" with ${workout.exercises?.length || 'several'} exercises.`
             }
             setChatMessages(prev => [...prev, successMessage])
-            
-            // Refresh calendar to show the newly created workout immediately  
-            await loadWorkouts()
-            
-            // Small delay for better visual feedback
-            await new Promise(resolve => setTimeout(resolve, 500))
 
           } else {
             errorCount++
@@ -705,10 +614,9 @@ export default function FlexFitApp() {
             
             // Add error message to chat
             const errorMessage: ChatMessage = {
-              id: (Date.now() + i + 2000).toString(),
+              id: Date.now() + i + 2000,
               role: "assistant", 
-              content: `❌ Failed to generate ${dayName} ${dayPlan.isRest ? 'rest day' : 'workout'}: ${response.status} - ${errorText}`,
-              timestamp: new Date()
+              content: `❌ Failed to generate ${dayName} workout: ${response.status} - ${errorText}`
             }
             setChatMessages(prev => [...prev, errorMessage])
           }
@@ -719,10 +627,9 @@ export default function FlexFitApp() {
           
           // Add error message to chat
           const errorMessage: ChatMessage = {
-            id: (Date.now() + i + 3000).toString(),
+            id: Date.now() + i + 3000,
             role: "assistant",
-            content: `❌ ${dayName} ${dayPlan.isRest ? 'rest day' : 'workout'} failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            timestamp: new Date()
+            content: `❌ ${dayName} workout failed: ${error instanceof Error ? error.message : 'Unknown error'}`
           }
           setChatMessages(prev => [...prev, errorMessage])
         }
@@ -735,17 +642,16 @@ export default function FlexFitApp() {
 
       // Final summary message
       const summaryMessage: ChatMessage = {
-        id: (Date.now() + 10000).toString(),
+        id: Date.now() + 10000,
         role: "assistant",
-        content: `🎉 Smart Queue Weekly Plan completed! Successfully generated ${successCount}/7 days (including rest days).${errorCount > 0 ? ` ${errorCount} failed.` : ' All days planned successfully!'} Your plan includes proper rest and recovery based on your workout history.`,
-        timestamp: new Date()
+        content: `🎉 Queue Weekly Plan completed! Successfully generated ${successCount}/7 workouts.${errorCount > 0 ? ` ${errorCount} failed.` : ' All workouts created successfully!'}`
       }
       setChatMessages(prev => [...prev, summaryMessage])
 
       if (successCount > 0) {
         setGenerationStatus({
           type: 'success',
-          message: `Smart weekly plan completed! Successfully generated ${successCount}/7 days.${errorCount > 0 ? ` ${errorCount} failed.` : ''}`
+          message: `Queue weekly plan completed! Successfully generated ${successCount}/7 workouts.${errorCount > 0 ? ` ${errorCount} failed.` : ''}`
         })
         // Refresh workouts to show the new ones
         await loadWorkouts()
@@ -758,16 +664,15 @@ export default function FlexFitApp() {
       
       // Add final error message to chat
       const errorMessage: ChatMessage = {
-        id: (Date.now() + 20000).toString(),
+        id: Date.now() + 20000,
         role: "assistant",
-        content: `💥 Smart Queue Weekly Plan failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        timestamp: new Date()
+        content: `💥 Queue Weekly Plan failed: ${error instanceof Error ? error.message : 'Unknown error'}`
       }
       setChatMessages(prev => [...prev, errorMessage])
 
       setGenerationStatus({
         type: 'error',
-        message: `Failed to generate smart weekly plan: ${error instanceof Error ? error.message : 'Unknown error'}`
+        message: `Failed to generate queue weekly plan: ${error instanceof Error ? error.message : 'Unknown error'}`
       })
     } finally {
       setIsGenerating(false)
@@ -843,7 +748,7 @@ export default function FlexFitApp() {
       } else if (input.includes("help") || input.includes("?")) {
         responseContent = `I'm here to help with your fitness journey! I can assist with:\n\n• 💪 **AI Workout Generation** - Say "create me a 1 week crossfit training"\n• 📅 Scheduling your fitness routine\n• 🥗 Basic nutrition guidance\n• ⚙️ Adjusting your preferences\n\n**Try these commands:**\n• "Create me a 3 day strength training"\n• "Generate a week of HIIT workouts"\n• "I need a yoga session"`
       } else if (input.includes("schedule") || input.includes("time") || input.includes("when")) {
-        responseContent = `Based on your preferences, I recommend:\n\n• Aim for ${userPreferences.workoutsPerWeek} workouts per week\n• Each session around ${userPreferences.workoutDuration} minutes\n• Use the calendar above to track your progress\n\nWould you like me to generate a specific workout schedule?`
+        responseContent = `Based on your ${userPreferences.timePreference} preference, I recommend:\n\n• Aim for ${userPreferences.workoutsPerWeek} workouts per week\n• Each session around ${userPreferences.workoutDuration} minutes\n• Use the calendar above to track your progress\n\nWould you like me to generate a specific workout schedule?`
       } else {
         responseContent = `I understand you're asking about "${chatInput}". As your AI fitness assistant, I can:\n\n🤖 **Generate Real Workouts** - Try: "create me a 1 week crossfit training"\n📋 **Plan Your Schedule** - I'll create personalized workout plans\n💾 **Save Everything** - All workouts are saved to your calendar\n\nCurrent preferences: ${userPreferences.fitnessGoal}, ${userPreferences.experienceLevel} level\n\nWhat workout would you like me to create?`
       }
@@ -875,6 +780,43 @@ export default function FlexFitApp() {
     }
 
     setChatInput("")
+  }
+
+  // TTS handlers
+  const handleGenerateAudio = async () => {
+    if (!currentWorkout?.content) {
+      return
+    }
+
+    // Convert markdown to plain text for TTS
+    const plainText = currentWorkout.content
+      .replace(/[#*`]/g, '') // Remove markdown formatting
+      .replace(/\n+/g, ' ') // Replace newlines with spaces
+      .trim()
+
+    if (!plainText) {
+      return
+    }
+
+    await synthesizeAudio({
+      text: plainText,
+      voiceName: selectedVoice,
+      languageCode: 'en-US',
+      audioEncoding: 'MP3'
+    })
+  }
+
+  const handleDownloadAudio = () => {
+    if (audioBlob) {
+      const url = URL.createObjectURL(audioBlob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `workout-voice-over-${new Date().toISOString().split('T')[0]}.mp3`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    }
   }
 
   const getWorkoutSuggestion = (): string => {
@@ -1224,11 +1166,8 @@ export default function FlexFitApp() {
             })
           } else {
             console.error('❌ Login failed:', result.error);
-            const errorMessage = result.error || 'Invalid email or password. Please check your credentials and try again.';
-            setError(errorMessage)
+            setError(result.error || 'Login failed')
             setDetailedError(result)
-            // Ensure dialog stays open on error
-            setDialogOpen(true)
           }
         } else {
           console.log('📝 Attempting registration...');
@@ -1258,20 +1197,15 @@ export default function FlexFitApp() {
             })
           } else {
             console.error('❌ Registration failed:', result.error);
-            const errorMessage = result.error || 'Registration failed. Please check your information and try again.';
-            setError(errorMessage)
+            setError(result.error || 'Registration failed')
             setDetailedError(result)
-            // Ensure dialog stays open on error
-            setDialogOpen(true)
           }
         }
       } catch (err) {
         console.error('💥 Unexpected error during submission:', err);
-        const errorMsg = 'An unexpected error occurred. Please check your internet connection and try again.';
+        const errorMsg = 'An unexpected error occurred';
         setError(errorMsg)
         setDetailedError({ error: errorMsg, exception: err })
-        // Ensure dialog stays open on error
-        setDialogOpen(true)
       } finally {
         setIsSubmitting(false)
         console.groupEnd();
@@ -1286,14 +1220,7 @@ export default function FlexFitApp() {
     }
 
     return (
-      <Dialog open={dialogOpen} onOpenChange={(open) => {
-        setDialogOpen(open);
-        if (open) {
-          // Clear any previous errors when opening dialog
-          setError(null);
-          setDetailedError(null);
-        }
-      }}>
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogTrigger asChild>
           <Button 
             variant={type === "login" ? "outline" : "default"}
@@ -1306,7 +1233,7 @@ export default function FlexFitApp() {
           <DialogHeader>
             <DialogTitle className="text-center">{type === "login" ? "Welcome Back" : "Join FlexFit"}</DialogTitle>
           </DialogHeader>
-          <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
+          <div className="space-y-4">
             {error && (
               <div className="space-y-2">
                 <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-md text-sm">
@@ -1372,12 +1299,6 @@ export default function FlexFitApp() {
                 placeholder="your@email.com"
                 value={formData.email}
                 onChange={(e) => handleInputChange('email', e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleSubmit();
-                  }
-                }}
                 disabled={isSubmitting}
               />
               {formData.email && !formData.email.includes('@') && (
@@ -1392,12 +1313,6 @@ export default function FlexFitApp() {
                 type="password"
                 value={formData.password}
                 onChange={(e) => handleInputChange('password', e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleSubmit();
-                  }
-                }}
                 disabled={isSubmitting}
                 placeholder={type === "register" ? "Min. 8 characters" : ""}
               />
@@ -1486,7 +1401,7 @@ export default function FlexFitApp() {
                 type === "login" ? "Sign In" : "Create Account"
               )}
             </Button>
-          </form>
+          </div>
         </DialogContent>
       </Dialog>
     )
@@ -1796,39 +1711,6 @@ export default function FlexFitApp() {
                             <span className="font-semibold">{currentWorkout.type}</span>
                           </div>
                         </div>
-                        
-                        {/* Complete Workout Button */}
-                        {(currentWorkout.status === WorkoutStatus.PLANNED || currentWorkout.status === WorkoutStatus.REST) && (
-                          <Button
-                            onClick={async () => {
-                              try {
-                                const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/workout-plan-service/api/v1/plans/workout/${currentWorkout.id}/complete`, {
-                                  method: 'PUT',
-                                  headers: {
-                                    'Authorization': `Bearer ${localStorage.getItem('flexfit_token')}`
-                                  }
-                                });
-                                if (response.ok) {
-                                  // Refresh workouts to update status
-                                  await loadWorkouts();
-                                }
-                              } catch (error) {
-                                console.error('Failed to complete workout:', error);
-                              }
-                            }}
-                            className="bg-green-600 hover:bg-green-700 text-white text-sm font-medium py-2 px-4 rounded-md transition-colors shadow-lg"
-                          >
-                            ✓ {currentWorkout.status === WorkoutStatus.REST ? 'Complete Rest Day' : 'Complete Workout'}
-                          </Button>
-                        )}
-                        
-                        {/* Completed Status Indicator */}
-                        {currentWorkout.status === WorkoutStatus.COMPLETED && (
-                          <div className="flex items-center space-x-2 text-green-600">
-                            <Check className="h-5 w-5" />
-                            <span className="font-medium text-sm">Completed</span>
-                          </div>
-                        )}
                       </div>
 
                       <Separator />
@@ -1837,7 +1719,6 @@ export default function FlexFitApp() {
                       <ScrollArea className="h-96">
                         <div className="prose prose-sm max-w-none">
                           <ReactMarkdown
-                            remarkPlugins={[remarkGfm]}
                             components={{
                               h1: ({ children }) => (
                                 <h1 className="text-3xl font-bold text-gray-900 mb-6 flex items-center gap-2 border-b border-gray-200 pb-3">
@@ -2026,7 +1907,29 @@ export default function FlexFitApp() {
                         </Select>
                       </div>
 
-
+                      <div>
+                        <Label className="text-xs">Time Preference</Label>
+                        <Select
+                          value={userPreferences.timePreference}
+                          onValueChange={(value) =>
+                            setUserPreferences((prev) => ({
+                              ...prev,
+                              timePreference: value as TimePreference,
+                            }))
+                          }
+                        >
+                          <SelectTrigger className="h-8">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Object.values(TimePreference).map((time) => (
+                              <SelectItem key={time} value={time}>
+                                {time}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
 
                       <div>
                         <Label className="text-xs">Intensity Level</Label>
@@ -2092,6 +1995,37 @@ export default function FlexFitApp() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
+                    {/* Quick Generation Buttons */}
+                    <div className="grid grid-cols-3 gap-2">
+                      <Button
+                        onClick={handleGenerateDailyWorkout}
+                        disabled={isGenerating}
+                        className="bg-blue-600 hover:bg-blue-700 text-white py-2"
+                        size="sm"
+                      >
+                        <Zap className="h-3 w-3 mr-1" />
+                        {isGenerating ? 'Generating...' : 'Daily Workout'}
+                      </Button>
+                      <Button
+                        onClick={handleGenerateWeeklyWorkout}
+                        disabled={isGenerating}
+                        className="bg-green-600 hover:bg-green-700 text-white py-2"
+                        size="sm"
+                      >
+                        <CalendarIcon className="h-3 w-3 mr-1" />
+                        {isGenerating ? 'Generating...' : 'Weekly Plan'}
+                      </Button>
+                      <Button
+                        onClick={handleGenerateQueueWeeklyWorkout}
+                        disabled={isGenerating}
+                        className="bg-purple-600 hover:bg-purple-700 text-white py-2"
+                        size="sm"
+                      >
+                        <CalendarIcon className="h-3 w-3 mr-1" />
+                        {isGenerating ? 'Generating...' : 'Queue Weekly'}
+                      </Button>
+                    </div>
+
                     {/* Generation Status */}
                     {generationStatus && (
                       <div className={`p-2 rounded-lg text-sm ${
@@ -2141,7 +2075,7 @@ export default function FlexFitApp() {
                     {/* Chat Input */}
                     <div className="flex space-x-2">
                       <Input
-                        placeholder="Additional Request (optional)..."
+                        placeholder="Ask me anything about workouts or add custom instructions..."
                         value={chatInput}
                         onChange={(e) => {
                           setChatInput(e.target.value)
@@ -2157,37 +2091,83 @@ export default function FlexFitApp() {
                         <Send className="h-4 w-4" />
                       </Button>
                     </div>
+                  </div>
+                </CardContent>
+              </Card>
 
-                    {/* Quick Generation Buttons */}
-                    <div className="grid grid-cols-3 gap-2">
-                      <Button
-                        onClick={handleGenerateDailyWorkout}
-                        disabled={isGenerating}
-                        className="bg-blue-600 hover:bg-blue-700 text-white py-2"
-                        size="sm"
+              {/* Workout Voice-Over Section */}
+              <Card className="bg-white/80 backdrop-blur-sm">
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <Play className="h-5 w-5" />
+                    <span>Workout Voice-Over</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {/* Voice Selection */}
+                    <div>
+                      <Label className="text-xs">Voice Selection</Label>
+                      <Select
+                        value={selectedVoice}
+                        onValueChange={(value) => setSelectedVoice(value)}
                       >
-                        <Zap className="h-3 w-3 mr-1" />
-                        {isGenerating ? 'Generating...' : 'Daily Workout'}
-                      </Button>
-                      <Button
-                        onClick={handleGenerateWeeklyWorkout}
-                        disabled={isGenerating}
-                        className="bg-green-600 hover:bg-green-700 text-white py-2"
-                        size="sm"
-                      >
-                        <CalendarIcon className="h-3 w-3 mr-1" />
-                        {isGenerating ? 'Generating...' : 'Weekly Plan'}
-                      </Button>
-                      <Button
-                        onClick={handleGenerateQueueWeeklyWorkout}
-                        disabled={isGenerating}
-                        className="bg-purple-600 hover:bg-purple-700 text-white py-2"
-                        size="sm"
-                      >
-                        <CalendarIcon className="h-3 w-3 mr-1" />
-                        {isGenerating ? 'Generating...' : 'Queue Weekly'}
-                      </Button>
+                        <SelectTrigger className="h-8">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="en-US-Neural2-F">Female Voice (US)</SelectItem>
+                          <SelectItem value="en-US-Neural2-M">Male Voice (US)</SelectItem>
+                          <SelectItem value="en-US-Neural2-A">Neutral Voice (US)</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
+
+                    {/* TTS Error Display */}
+                    {ttsError && (
+                      <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+                        <div className="flex justify-between items-center">
+                          <span>{ttsError}</span>
+                          <button 
+                            onClick={clearTtsError}
+                            className="text-red-700 hover:text-red-900"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* TTS Buttons */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <Button
+                        onClick={handleGenerateAudio}
+                        disabled={isGeneratingAudio || isSynthesizing || !currentWorkout?.content}
+                        className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 text-white font-medium py-3 px-4 rounded-md transition-colors"
+                      >
+                        {isGeneratingAudio || isSynthesizing ? 'Generating Audio...' : 'Generate Voice-Over'}
+                      </Button>
+                      
+                      {audioUrl && (
+                        <Button
+                          onClick={handleDownloadAudio}
+                          className="w-full bg-orange-600 hover:bg-orange-700 text-white font-medium py-3 px-4 rounded-md transition-colors"
+                        >
+                          Download Audio
+                        </Button>
+                      )}
+                    </div>
+
+                    {/* Audio Player */}
+                    {audioUrl && (
+                      <div className="mt-4 p-4 bg-gray-50 rounded-md">
+                        <h3 className="font-medium mb-2">Audio Preview:</h3>
+                        <audio controls className="w-full">
+                          <source src={audioUrl} type="audio/mpeg" />
+                          Your browser does not support the audio element.
+                        </audio>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>

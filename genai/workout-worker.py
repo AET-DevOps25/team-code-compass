@@ -164,20 +164,13 @@ weekly_parser = JsonOutputParser(pydantic_object=GenAIWeeklyResponse)
 weekly_prompt_template_str = """
 Create a 7-day workout plan. User context: {context}
 
-WORKOUT HISTORY ANALYSIS:
-- Review last_7_days_exercises to avoid repeating recent exercises
-- Consider muscle groups trained recently for balanced weekly programming
-- Ensure adequate recovery between similar exercise patterns
-- Vary training intensities based on recent workout completion rates
-
 Rules:
 - Generate 7 consecutive days of workouts
 - Vary sport types: STRENGTH, HIIT, YOGA_MOBILITY, RUNNING_INTERVALS, REST
 - Use valid equipment: NO_EQUIPMENT, DUMBBELLS_PAIR_MEDIUM, BARBELL_WITH_PLATES, BENCH_FLAT, YOGA_MAT
-- Include 1-2 REST days for recovery (more if recent workouts show high intensity)
+- Include 1-2 REST days for recovery
 - 3-5 exercises per workout (0 exercises for REST days)
 - Difficulty: Beginner, Intermediate, Advanced
-- AVOID exercises from last_7_days_exercises unless necessary for progression
 
 JSON format:
 {{
@@ -221,18 +214,9 @@ GUIDELINES:
 ### Personalization
 Create exercises that align with the user's experience_level, fitness_goals, preferred_sport_types, available_equipment, and intensity_preference.
 
-### Workout History Analysis
-CRITICALLY IMPORTANT: Analyze the user's last_7_days_exercises to ensure variety and proper recovery:
-- AVOID repeating exercises from recent workouts (last 7 days)
-- Consider muscle groups trained recently - focus on different muscle groups or use different movement patterns
-- If recent workouts were high intensity, consider lower intensity or recovery-focused exercises
-- If the same sport type was done recently, vary the exercise selection significantly
-- For REST days, create light recovery activities (gentle stretching, mobility work, breathing exercises)
-- Pay attention to completion_status of recent workouts to gauge user's current fitness state
-
 ### Variety & Balance
 Provide a balanced workout targeting the focus_sport_type_for_the_day. Make each workout DIFFERENT from previous days by varying:
-- Exercise selection and order (especially avoiding recent exercises)
+- Exercise selection and order
 - Rep ranges (strength vs endurance)  
 - Set schemes (straight sets, circuits, supersets)
 - Rest periods and intensity zones
@@ -258,7 +242,6 @@ Use only these exact values for applicable_sport_types:
 - "HIIT" (high-intensity interval training, CrossFit)
 - "YOGA_MOBILITY" (yoga, stretching, flexibility)
 - "RUNNING_INTERVALS" (running, cardio intervals)
-- "REST" (recovery day - MUST have empty scheduled_exercises array)
 
 ### Exercise Structure Requirements
 Each exercise MUST include:
@@ -284,14 +267,6 @@ Generate comprehensive markdown_content including:
 - Progress tracking suggestions
 - Use proper markdown formatting with headers, tables, and lists
 
-### CRITICAL: Table Formatting Rules
-When creating exercise tables in markdown_content:
-- ALWAYS use proper newlines (\\n) between table rows
-- Table format MUST be: header row, separator row, then data rows
-- Example: "| Exercise | Sets | Reps |\\n|----------|------|------|\\n| Push-ups | 3 | 10 |\\n| Squats | 3 | 15 |"
-- Each table row MUST end with \\n before the next row starts
-- Do NOT put all table content on a single line
-
 ### Output Requirements
 1. Create 4-8 exercises depending on duration and complexity
 2. Include proper sequence_order for each exercise
@@ -303,20 +278,6 @@ When creating exercise tables in markdown_content:
 
 ### Day-Specific Variation
 Consider the specific day_date and create content that feels fresh and different from previous workouts while maintaining consistency with user preferences.
-
-### REST Day Handling
-CRITICAL: If focus_sport_type_for_the_day is "REST":
-- Set scheduled_exercises to an empty array: []
-- Create recovery-focused markdown_content with light activities
-- Include recommendations for hydration, sleep, and gentle movement
-- Do NOT create any structured exercises or workouts
-
-### Custom Instructions
-If a text_prompt is provided in the context, incorporate those specific instructions and preferences into the workout design. This may include:
-- Specific exercise requests or modifications
-- Focus areas or training goals for the day
-- Recovery or rest day specifications
-- Special considerations or adaptations
 
 ### JSON Structure Example
 {{
@@ -338,7 +299,7 @@ If a text_prompt is provided in the context, incorporate those specific instruct
         "video_url": null
       }}
     ],
-    "markdown_content": "# HIIT Workout\\n\\n## Warm-up\\n- Light jogging in place: 2 minutes\\n\\n## Main Workout\\n\\n| Exercise | Sets | Reps | Rest |\\n|----------|------|------|------|\\n| Burpees | 3 | 10 | 60s |\\n| Mountain Climbers | 3 | 20 | 45s |\\n\\n## Cool Down\\n- Static stretching: 5 minutes"
+    "markdown_content": "# HIIT Workout\\n\\n## Warm-up\\n- Light jogging in place: 2 minutes\\n\\n## Main Workout\\n| Exercise | Sets | Reps | Rest |\\n|----------|------|------|------|\\n| Burpees | 3 | 10 | 60s |\\n\\n## Cool Down\\n- Static stretching: 5 minutes"
   }}
 }}
 """
@@ -453,36 +414,8 @@ def generate_mock_response(context: PromptContext) -> GenAIResponse:
                 voice_script_cue_text="Stay explosive and keep moving"
             )
         ]
-    elif sport_type == "REST":
-        # REST days have no exercises
-        mock_exercises = []
     
-    # Handle REST day markdown content differently
-    if sport_type == "REST":
-        markdown_content = f"""# {sport_type} Day - {date}
-
-## Rest Day Overview
-- **Duration**: Full day recovery
-- **Focus**: Recovery and regeneration
-- **Sport Type**: {sport_type}
-
-## Recommendations
-- Light walking or gentle stretching (10-15 minutes)
-- Focus on hydration and nutrition
-- Get adequate sleep (7-9 hours) for recovery
-- Practice mindfulness or meditation
-
-## Optional Light Activities
-- 10-15 minutes of gentle stretching
-- Light walk or leisurely bike ride
-- Breathing exercises and relaxation
-- Foam rolling or self-massage
-
-## Coach's Notes
-Rest days are crucial for muscle recovery, adaptation, and preventing overtraining. Listen to your body and avoid intense physical activity.
-"""
-    else:
-        markdown_content = f"""# {sport_type} Workout - {date}
+    markdown_content = f"""# {sport_type} Workout - {date}
 
 ## Workout Overview
 - **Duration**: {duration} minutes

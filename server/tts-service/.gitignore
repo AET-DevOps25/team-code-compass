@@ -1,0 +1,4 @@
+# Google Cloud credentials
+google-credentials.json
+*.json
+!pom.xml 

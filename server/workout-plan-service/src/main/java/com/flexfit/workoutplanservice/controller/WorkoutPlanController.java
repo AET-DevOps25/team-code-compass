@@ -88,34 +88,4 @@ public class WorkoutPlanController {
             "description", "FlexFit Workout Plan Management Service"
         );
     }
-
-    @PutMapping("/workout/{workoutId}/complete")
-    @SecurityRequirement(name = "bearerAuth")
-    public ResponseEntity<DailyWorkoutResponse> completeWorkout(
-            @PathVariable UUID workoutId,
-            @RequestHeader("Authorization") String bearerToken) {
-        
-        Optional<DailyWorkoutResponse> completedWorkout = workoutPlanService.completeWorkout(workoutId);
-        
-        return completedWorkout.map(ResponseEntity::ok)
-                              .orElse(ResponseEntity.notFound().build());
-    }
-
-    @PutMapping("/exercise/{exerciseId}/complete")
-    @SecurityRequirement(name = "bearerAuth")
-    public ResponseEntity<Map<String, String>> completeExercise(
-            @PathVariable UUID exerciseId,
-            @RequestHeader("Authorization") String bearerToken) {
-        
-        boolean success = workoutPlanService.completeExercise(exerciseId);
-        
-        if (success) {
-            return ResponseEntity.ok(Map.of(
-                "status", "success",
-                "message", "Exercise marked as completed"
-            ));
-        } else {
-            return ResponseEntity.notFound().build();
-        }
-    }
 }

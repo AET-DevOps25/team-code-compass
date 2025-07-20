@@ -141,27 +141,6 @@ export class WorkoutService {
   }
 
   /**
-   * Get workouts for the last 7 days (for workout history context)
-   * Note: This requires the user ID to be passed. In a real implementation,
-   * you'd get this from the auth context or user profile
-   */
-  async getLastWeeksWorkouts(userId: string): Promise<ApiResponse<DailyWorkoutResponse[]>> {
-    const today = new Date();
-    const sevenDaysAgo = new Date(today);
-    sevenDaysAgo.setDate(today.getDate() - 7);
-    
-    const yesterday = new Date(today);
-    yesterday.setDate(today.getDate() - 1);
-
-    const dateRange: WorkoutDateRange = {
-      startDate: sevenDaysAgo.toISOString().split('T')[0],
-      endDate: yesterday.toISOString().split('T')[0]
-    };
-
-    return this.getMyWorkoutsByDateRange(dateRange, userId);
-  }
-
-  /**
    * Get workouts for the current month (convenience method)
    * Note: This requires the user ID to be passed. In a real implementation,
    * you'd get this from the auth context or user profile
@@ -230,24 +209,6 @@ export class WorkoutService {
       startDate: this.formatDateForAPI(startDate),
       endDate: this.formatDateForAPI(endDate)
     };
-  }
-
-  /**
-   * Mark a workout as completed
-   */
-  async completeWorkout(workoutId: string): Promise<ApiResponse<DailyWorkoutResponse>> {
-    return apiClient.put<DailyWorkoutResponse>(
-      `${this.baseEndpoint}/workout/${workoutId}/complete`
-    );
-  }
-
-  /**
-   * Mark an exercise as completed
-   */
-  async completeExercise(exerciseId: string): Promise<ApiResponse<{ status: string; message: string }>> {
-    return apiClient.put<{ status: string; message: string }>(
-      `${this.baseEndpoint}/exercise/${exerciseId}/complete`
-    );
   }
 }
 

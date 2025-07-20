@@ -1,0 +1,61 @@
+spring:
+  application:
+    name: tts-service
+  profiles:
+    active: docker
+
+server:
+  port: ${PORT:8083}
+  forward-headers-strategy: framework
+
+# Actuator configuration for Prometheus metrics
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+    metrics:
+      enabled: true
+    prometheus:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    tags:
+      application: ${spring.application.name}
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_SERVER:http://localhost:8761/eureka}
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true
+    hostname: localhost
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+    enabled: true
+  swagger-ui:
+    path: /swagger-ui.html
+    disable-swagger-default-url: true
+    config-url: /v3/api-docs/swagger-config
+    url: /v3/api-docs
+    try-it-out-enabled: true
+    filter: true
+  show-actuator: false
+  use-fqn: true
+
+# Google Cloud TTS Configuration
+google:
+  cloud:
+    tts:
+      voice-name: ${TTS_VOICE_NAME:en-US-Neural2-F}
+      language-code: ${TTS_LANGUAGE_CODE:en-US}
+      audio-encoding: ${TTS_AUDIO_ENCODING:MP3} 

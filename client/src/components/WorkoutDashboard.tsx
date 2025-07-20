@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useWorkout, useWorkoutGeneration } from '../hooks/useWorkout';
-import { SportType, CompletionStatus } from '../types/workout';
+import { useTts } from '../hooks/useTts';
+import { SportType } from '../types/workout';
 import { workoutService, WeeklyWorkoutGenerationOptions } from '../services/workoutService';
 
 export function WorkoutDashboard() {
@@ -21,11 +22,27 @@ export function WorkoutDashboard() {
     clearError: clearGenerationError
   } = useWorkoutGeneration();
 
+  const {
+    isGenerating: isGeneratingAudio,
+    isSynthesizing,
+    error: ttsError,
+    audioUrl,
+    audioBlob,
+    availableVoices,
+    isLoadingVoices,
+    generateAudio,
+    synthesizeAudio,
+    loadAvailableVoices,
+    clearError: clearTtsError,
+    clearAudio
+  } = useTts();
+
   const [selectedSport, setSelectedSport] = useState<SportType>(SportType.STRENGTH);
   const [duration, setDuration] = useState(30);
   const [customPrompt, setCustomPrompt] = useState('');
   const [isGeneratingWeekly, setIsGeneratingWeekly] = useState(false);
   const [weeklyWorkouts, setWeeklyWorkouts] = useState<any[]>([]);
+  const [selectedVoice, setSelectedVoice] = useState<string>('en-US-Neural2-F');
 
   const handleGenerateWorkout = async () => {
     clearGenerationError();
@@ -76,41 +93,39 @@ export function WorkoutDashboard() {
     await getWorkoutHistory();
   };
 
-  const handleCompleteExercise = async (exerciseId: string) => {
-    try {
-      console.log('Completing exercise:', exerciseId);
-      
-      const response = await workoutService.completeExercise(exerciseId);
-      
-      if (response.data) {
-        console.log('Exercise completed successfully:', response.data.message);
-        // Refresh the workout to update the UI with new completion status
-        await getTodaysWorkout();
-      } else if (response.error) {
-        console.error('Failed to complete exercise:', response.error);
-      }
-    } catch (error) {
-      console.error('Failed to complete exercise:', error);
+  const handleGenerateAudio = async () => {
+    if (!currentWorkout?.markdownContent) {
+      return;
     }
+
+    // Convert markdown to plain text for TTS
+    const plainText = currentWorkout.markdownContent
+      .replace(/[#*`]/g, '') // Remove markdown formatting
+      .replace(/\n+/g, ' ') // Replace newlines with spaces
+      .trim();
+
+    if (!plainText) {
+      return;
+    }
+
+    await synthesizeAudio({
+      text: plainText,
+      voiceName: selectedVoice,
+      languageCode: 'en-US',
+      audioEncoding: 'MP3'
+    });
   };
 
-  const handleCompleteWorkout = async () => {
-    if (!currentWorkout) return;
-    
-    try {
-      console.log('Completing workout:', currentWorkout.id);
-      
-      const response = await workoutService.completeWorkout(currentWorkout.id);
-      
-      if (response.data) {
-        console.log('Workout completed successfully:', response.data);
-        // Refresh the workout to update the UI with new completion status
-        await getTodaysWorkout();
-      } else if (response.error) {
-        console.error('Failed to complete workout:', response.error);
-      }
-    } catch (error) {
-      console.error('Failed to complete workout:', error);
+  const handleDownloadAudio = () => {
+    if (audioBlob) {
+      const url = URL.createObjectURL(audioBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `workout-voice-over-${new Date().toISOString().split('T')[0]}.mp3`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
     }
   };
 
@@ -147,9 +162,23 @@ export function WorkoutDashboard() {
         </div>
       )}
 
+      {ttsError && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          <div className="flex justify-between items-center">
+            <span>{ttsError}</span>
+            <button 
+              onClick={clearTtsError}
+              className="text-red-700 hover:text-red-900"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Workout Generation Section */}
       <div className="bg-white shadow-md rounded-lg p-6 mb-6">
-        <h2 className="text-xl font-semibold mb-4">Generate Workouts</h2>
+        <h2 className="text-xl font-semibold mb-4">AI Workout Assistant</h2>
         
         {/* Basic Settings */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -220,6 +249,56 @@ export function WorkoutDashboard() {
         </div>
       </div>
 
+      {/* Workout Voice-Over Section */}
+      <div className="bg-white shadow-md rounded-lg p-6 mb-6">
+        <h2 className="text-xl font-semibold mb-4">Workout Voice-Over</h2>
+        
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Voice Selection
+          </label>
+          <select
+            value={selectedVoice}
+            onChange={(e) => setSelectedVoice(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="en-US-Neural2-F">Female Voice (US)</option>
+            <option value="en-US-Neural2-M">Male Voice (US)</option>
+            <option value="en-US-Neural2-A">Neutral Voice (US)</option>
+          </select>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <button
+            onClick={handleGenerateAudio}
+            disabled={isGeneratingAudio || isSynthesizing || !currentWorkout?.markdownContent}
+            className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 text-white font-medium py-3 px-4 rounded-md transition-colors"
+          >
+            {isGeneratingAudio || isSynthesizing ? 'Generating Audio...' : 'Generate Voice-Over'}
+          </button>
+          
+          {audioUrl && (
+            <button
+              onClick={handleDownloadAudio}
+              className="w-full bg-orange-600 hover:bg-orange-700 text-white font-medium py-3 px-4 rounded-md transition-colors"
+            >
+              Download Audio
+            </button>
+          )}
+        </div>
+
+        {/* Audio Player */}
+        {audioUrl && (
+          <div className="mt-4 p-4 bg-gray-50 rounded-md">
+            <h3 className="font-medium mb-2">Audio Preview:</h3>
+            <audio controls className="w-full">
+              <source src={audioUrl} type="audio/mpeg" />
+              Your browser does not support the audio element.
+            </audio>
+          </div>
+        )}
+      </div>
+
       {/* Weekly Workouts Display */}
       {weeklyWorkouts.length > 0 && (
         <div className="bg-white shadow-md rounded-lg p-6 mb-6">
@@ -269,30 +348,13 @@ export function WorkoutDashboard() {
           </div>
         ) : hasWorkoutForToday && currentWorkout ? (
           <div>
-            <div className="mb-4 flex justify-between items-center">
-              <div>
-                <span className="inline-block bg-blue-100 text-blue-800 text-sm font-medium px-2.5 py-0.5 rounded">
-                  {currentWorkout.focusSportTypeForTheDay.replace('_', ' ')}
-                </span>
-                <span className={`inline-block text-sm font-medium px-2.5 py-0.5 rounded ml-2 ${
-                  currentWorkout.completionStatus === 'COMPLETED' 
-                    ? 'bg-green-100 text-green-800' 
-                    : currentWorkout.completionStatus === 'IN_PROGRESS'
-                    ? 'bg-yellow-100 text-yellow-800'
-                    : 'bg-gray-100 text-gray-800'
-                }`}>
-                  {currentWorkout.completionStatus?.replace('_', ' ') || 'PENDING'}
-                </span>
-              </div>
-              
-              {currentWorkout.completionStatus !== 'COMPLETED' && (
-                <button
-                  onClick={handleCompleteWorkout}
-                  className="bg-green-600 hover:bg-green-700 text-white text-sm font-medium py-2 px-4 rounded-md transition-colors"
-                >
-                  ✓ Complete Workout
-                </button>
-              )}
+            <div className="mb-4">
+              <span className="inline-block bg-blue-100 text-blue-800 text-sm font-medium px-2.5 py-0.5 rounded">
+                {currentWorkout.focusSportTypeForTheDay.replace('_', ' ')}
+              </span>
+              <span className="inline-block bg-gray-100 text-gray-800 text-sm font-medium px-2.5 py-0.5 rounded ml-2">
+                {currentWorkout.completionStatus}
+              </span>
             </div>
 
             {currentWorkout.markdownContent && (
@@ -309,46 +371,15 @@ export function WorkoutDashboard() {
                 <h3 className="font-medium mb-3">Exercises ({currentWorkout.scheduledExercises.length}):</h3>
                 <div className="space-y-3">
                   {currentWorkout.scheduledExercises.map((exercise, index) => (
-                    <div key={exercise.id || index} className={`border-l-4 pl-4 p-3 rounded-r-md ${
-                      exercise.completionStatus === 'COMPLETED' 
-                        ? 'border-green-500 bg-green-50' 
-                        : exercise.completionStatus === 'IN_PROGRESS'
-                        ? 'border-yellow-500 bg-yellow-50'
-                        : 'border-blue-500 bg-white'
-                    }`}>
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <h4 className="font-medium">{exercise.sequenceOrder}. {exercise.exerciseName}</h4>
-                          <p className="text-sm text-gray-600 mb-1">{exercise.description}</p>
-                          <p className="text-sm text-blue-600">{exercise.prescribedSetsRepsDuration}</p>
-                          <div className="flex items-center gap-2 mt-2">
-                            {exercise.difficulty && (
-                              <span className="inline-block bg-yellow-100 text-yellow-800 text-xs font-medium px-2 py-1 rounded">
-                                {exercise.difficulty}
-                              </span>
-                            )}
-                            <span className={`inline-block text-xs font-medium px-2 py-1 rounded ${
-                              exercise.completionStatus === 'COMPLETED'
-                                ? 'bg-green-100 text-green-800'
-                                : exercise.completionStatus === 'IN_PROGRESS'
-                                ? 'bg-yellow-100 text-yellow-800'
-                                : 'bg-gray-100 text-gray-800'
-                            }`}>
-                              {exercise.completionStatus?.replace('_', ' ') || 'PENDING'}
-                            </span>
-                          </div>
-                        </div>
-                        
-                        {exercise.completionStatus !== 'COMPLETED' && (
-                          <button
-                            onClick={() => handleCompleteExercise(exercise.id || `${index}`)}
-                            className="ml-3 bg-green-600 hover:bg-green-700 text-white text-xs font-medium py-1 px-2 rounded transition-colors"
-                            title="Mark exercise as completed"
-                          >
-                            ✓
-                          </button>
-                        )}
-                      </div>
+                    <div key={exercise.id || index} className="border-l-4 border-blue-500 pl-4">
+                      <h4 className="font-medium">{exercise.sequenceOrder}. {exercise.exerciseName}</h4>
+                      <p className="text-sm text-gray-600 mb-1">{exercise.description}</p>
+                      <p className="text-sm text-blue-600">{exercise.prescribedSetsRepsDuration}</p>
+                      {exercise.difficulty && (
+                        <span className="inline-block bg-yellow-100 text-yellow-800 text-xs font-medium px-2 py-1 rounded mt-1">
+                          {exercise.difficulty}
+                        </span>
+                      )}
                     </div>
                   ))}
                 </div>
