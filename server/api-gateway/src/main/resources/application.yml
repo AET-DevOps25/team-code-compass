@@ -22,6 +22,12 @@ spring:
           predicates:
             - Path=/api/v1/plans/**
 
+        # TTS service routes - handle /api/tts/** directly
+        - id: tts-service
+          uri: lb://tts-service
+          predicates:
+            - Path=/api/tts/**
+
         # User service routes via service discovery path
         - id: user-service-discovery
           uri: lb://user-service
@@ -37,6 +43,14 @@ spring:
             - Path=/workout-plan-service/**
           filters:
             - RewritePath=/workout-plan-service/(?<segment>.*), /${segment}
+
+        # TTS service routes via service discovery path
+        - id: tts-service-discovery
+          uri: lb://tts-service
+          predicates:
+            - Path=/tts-service/**
+          filters:
+            - RewritePath=/tts-service/(?<segment>.*), /${segment}
 
         # Direct Swagger UI access for user service
         - id: user-service-swagger-ui
@@ -54,6 +68,14 @@ spring:
           filters:
             - StripPrefix=1
 
+        # Direct Swagger UI access for TTS service
+        - id: tts-service-swagger-ui
+          uri: lb://tts-service
+          predicates:
+            - Path=/tts-service/swagger-ui/**
+          filters:
+            - StripPrefix=1
+
         # API docs for user service
         - id: user-service-v3-api-docs
           uri: lb://user-service
@@ -67,6 +89,14 @@ spring:
           uri: lb://workout-plan-service
           predicates:
             - Path=/workout-plan-service/v3/api-docs/**
+          filters:
+            - StripPrefix=1
+
+        # API docs for TTS service
+        - id: tts-service-v3-api-docs
+          uri: lb://tts-service
+          predicates:
+            - Path=/tts-service/v3/api-docs/**
           filters:
             - StripPrefix=1
 
@@ -92,6 +122,17 @@ spring:
             - AddRequestHeader=X-Forwarded-Host, localhost:8080
             - AddRequestHeader=X-Forwarded-Proto, http
             - AddRequestHeader=X-Forwarded-Prefix, /docs/workout-plans
+
+        - id: tts-service-docs
+          uri: lb://tts-service
+          predicates:
+            - Path=/docs/tts/**
+          filters:
+            - StripPrefix=2
+            - RewritePath=/docs/tts/(?<remaining>.*), /${remaining}
+            - AddRequestHeader=X-Forwarded-Host, localhost:8080
+            - AddRequestHeader=X-Forwarded-Proto, http
+            - AddRequestHeader=X-Forwarded-Prefix, /docs/tts
             
         # API docs routes
         - id: user-service-api-docs
@@ -107,6 +148,15 @@ spring:
           uri: lb://workout-plan-service
           predicates:
             - Path=/docs/workout-plans/v3/api-docs/**
+          filters:
+            - StripPrefix=2
+            - AddRequestHeader=X-Forwarded-Host, localhost:8080
+            - AddRequestHeader=X-Forwarded-Proto, http
+
+        - id: tts-service-api-docs
+          uri: lb://tts-service
+          predicates:
+            - Path=/docs/tts/v3/api-docs/**
           filters:
             - StripPrefix=2
             - AddRequestHeader=X-Forwarded-Host, localhost:8080

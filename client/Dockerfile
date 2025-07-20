@@ -1,4 +1,4 @@
-# Multi-stage build for Next.js static export
+# Multi-stage build for Next.js app
 FROM node:18-alpine AS builder
 
 # Set working directory
@@ -13,28 +13,28 @@ RUN npm install --legacy-peer-deps
 # Copy source code
 COPY . .
 
-# Set environment variable for build
-ARG NEXT_PUBLIC_API_URL
-ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
-
-# Build the application for static export
+# Build the application
 RUN npm run build
 
-# Production stage with nginx
-FROM nginx:alpine AS production
+# Production stage
+FROM node:18-alpine AS production
 
-# Copy built static files
-COPY --from=builder /app/out /usr/share/nginx/html
+# Set working directory
+WORKDIR /app
 
-# Copy custom nginx configuration
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Copy package files
+COPY package.json ./
 
-# Expose port 80
-EXPOSE 80
+# Install dependencies with npm (legacy peer deps to resolve conflicts)
+RUN npm install --only=production --legacy-peer-deps
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost/ || exit 1
+# Copy built application
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/next.config.mjs ./next.config.mjs
 
-# Start nginx
-CMD ["nginx", "-g", "daemon off;"] 
+# Expose port
+EXPOSE 3000
+
+# Start the application
+CMD ["npm", "start"] 

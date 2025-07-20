@@ -1,4 +1,0 @@
-fastapi
-gtts
-uvicorn
-python-multipart 

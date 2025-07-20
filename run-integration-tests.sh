@@ -19,6 +19,7 @@ echo "====================================="
 BASE_URL="http://localhost:8080"
 USER_SERVICE_URL="http://localhost:8081"
 WORKOUT_SERVICE_URL="http://localhost:8082"
+TTS_SERVICE_URL="http://localhost:8083"
 GENAI_WORKER_URL="http://localhost:8000"
 EUREKA_URL="http://localhost:8761"
 
@@ -293,6 +294,44 @@ test_genai_worker_integration() {
     fi
 }
 
+# Test 7: TTS Service Integration
+test_tts_service_integration() {
+    echo "Testing TTS service integration..."
+    
+    # Test health endpoint
+    local health_response=$(curl -s "$TTS_SERVICE_URL/api/tts/health")
+    
+    if echo "$health_response" | grep -q "TTS Service"; then
+        echo "✓ TTS service health check passed"
+    else
+        echo "✗ TTS service health check failed"
+        return 1
+    fi
+    
+    # Test available voices endpoint
+    echo "  Testing available voices endpoint..."
+    local voices_response=$(curl -s "$TTS_SERVICE_URL/api/tts/voices")
+    
+    if echo "$voices_response" | grep -q "en-US"; then
+        echo "✓ Available voices endpoint working"
+    else
+        echo "✗ Available voices endpoint failed"
+        return 1
+    fi
+    
+    # Test metrics endpoint
+    echo "  Testing metrics endpoint..."
+    local metrics_response=$(curl -s "$TTS_SERVICE_URL/actuator/prometheus")
+    
+    if echo "$metrics_response" | grep -q "tts_"; then
+        echo "✓ TTS metrics endpoint working"
+        return 0
+    else
+        echo "✗ TTS metrics endpoint failed"
+        return 1
+    fi
+}
+
 # Test 7: End-to-End Workflow
 test_end_to_end_workflow() {
     echo "Testing complete end-to-end user workflow..."
@@ -447,6 +486,7 @@ main() {
     run_integration_test "Authentication Integration" test_authentication_integration
     run_integration_test "Workout Service Integration" test_workout_service_integration
     run_integration_test "GenAI Worker Integration" test_genai_worker_integration
+    run_integration_test "TTS Service Integration" test_tts_service_integration
     run_integration_test "End-to-End Workflow" test_end_to_end_workflow
     run_integration_test "Data Persistence" test_data_persistence
     

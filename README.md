@@ -15,6 +15,7 @@ The FlexFit platform follows a **Master-Worker microservices pattern** with **Se
 - **User Service**: User registration, authentication, and profile management
 - **Workout Plan Service**: Master orchestrator for workout planning and AI integration  
 - **GenAI Workout Worker**: AI-powered personalized workout generation worker
+- **TTS Service**: Text-to-speech functionality for audio generation and voice synthesis
 
 ## 🚀 Quick Start
 
@@ -99,7 +100,8 @@ docker compose down
 | **PostgreSQL** | `5432` | ✅ Healthy | Database server |
 | **User Service** | `8081` | ✅ Healthy | User management API |
 | **Workout Plan Service** | `8082` | ✅ Running | Workout planning API |
-| **GenAI Workout Worker** | `8083` | ✅ Healthy | AI workout generation |
+| **TTS Service** | `8083` | ✅ Healthy | Text-to-speech API |
+| **GenAI Workout Worker** | `8000` | ✅ Healthy | AI workout generation |
 
 ### Container Details
 - **Service Registry**: Spring Boot 3.5.0 with Netflix Eureka Server
@@ -107,6 +109,7 @@ docker compose down
 - **Database**: `postgres:16` with persistent storage and health checks
 - **User Service**: Spring Boot 3.5.0 with Eclipse Temurin JDK 21 + Eureka Client
 - **Workout Plan Service**: Spring Boot 3.5.0 with Eclipse Temurin JDK 21 + Eureka Client
+- **TTS Service**: Spring Boot 3.5.0 with Eclipse Temurin JDK 21 + Eureka Client + Google Cloud TTS
 - **GenAI Worker**: Python 3.11 with FastAPI and LangChain
 - **Network**: `flexfit-network` for inter-service communication
 - **Service Discovery**: Automatic service registration and discovery via Eureka
@@ -129,11 +132,13 @@ docker exec -it flexfit-postgres psql -U flexfit -d user_service_db
 # Check individual service logs
 docker compose logs user-service
 docker compose logs workout-plan-service
+docker compose logs tts-service
 docker compose logs genai-workout-worker
 docker compose logs postgres
 
 # Restart specific service
 docker compose restart workout-plan-service
+docker compose restart tts-service
 ```
 
 ## 📚 API Documentation
@@ -163,9 +168,15 @@ docker compose restart workout-plan-service
 - **OpenAPI JSON**: http://localhost:8082/v3/api-docs
 - **Root**: http://localhost:8082/
 
-#### GenAI Workout Worker (Port 8083)
-- **Health Check**: http://localhost:8083/health
-- **Generate Endpoint**: http://localhost:8083/generate
+#### TTS Service (Port 8083) - **Direct Access**
+- **Swagger UI**: http://localhost:8083/swagger-ui/index.html
+- **OpenAPI JSON**: http://localhost:8083/v3/api-docs
+- **Health Check**: http://localhost:8083/api/tts/health
+- **Root**: http://localhost:8083/
+
+#### GenAI Workout Worker (Port 8000)
+- **Health Check**: http://localhost:8000/health
+- **Generate Endpoint**: http://localhost:8000/generate
 
 ### 📋 Available API Endpoints
 
@@ -186,6 +197,14 @@ docker compose restart workout-plan-service
 | `POST` | `/api/v1/workout-plans/generate` | Generate workout plan |
 | `GET` | `/api/v1/workout-plans/{id}` | Get workout plan by ID |
 | `GET` | `/api/v1/daily-workouts` | Get daily workouts |
+
+#### TTS Service APIs
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/tts/health` | Service health status |
+| `POST` | `/api/tts/synthesize` | Convert text to speech (audio) |
+| `POST` | `/api/tts/generate` | Generate audio with metadata |
+| `GET` | `/api/tts/voices` | Get available voices |
 
 #### GenAI Workout Worker APIs
 | Method | Endpoint | Description |
@@ -237,6 +256,35 @@ curl -X POST http://localhost:8083/generate \
   }'
 ```
 
+#### TTS Service Examples
+```bash
+# Health Check
+curl http://localhost:8083/api/tts/health
+
+# Get Available Voices
+curl http://localhost:8083/api/tts/voices
+
+# Synthesize Text to Speech
+curl -X POST http://localhost:8083/api/tts/synthesize \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Welcome to your personalized workout plan!",
+    "voiceName": "en-US-Neural2-F",
+    "languageCode": "en-US",
+    "audioEncoding": "MP3"
+  }'
+
+# Generate Audio with Metadata
+curl -X POST http://localhost:8083/api/tts/generate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Today we will focus on upper body strength training.",
+    "voiceName": "en-US-Neural2-F",
+    "languageCode": "en-US",
+    "audioEncoding": "MP3"
+  }'
+```
+
 #### Health Checks
 ```bash
 # Check infrastructure services
@@ -246,11 +294,13 @@ curl http://localhost:8000/actuator/health  # API Gateway
 # Check business services (direct access)
 curl http://localhost:8081/actuator/health  # User Service
 curl http://localhost:8082/actuator/health  # Workout Plan Service
-curl http://localhost:8083/health           # GenAI Worker
+curl http://localhost:8083/api/tts/health   # TTS Service
+curl http://localhost:8000/health           # GenAI Worker
 
-# Check services via API Gateway (recommended)
+# Test via API Gateway (recommended approach)
 curl http://localhost:8000/api/users/health
 curl http://localhost:8000/api/workout-plans/health
+curl http://localhost:8000/api/tts/health
 ```
 
 ## 🛠️ Development
@@ -283,7 +333,11 @@ team-code-compass/
 │   │   ├── Dockerfile
 │   │   ├── pom.xml
 │   │   └── src/
-│   └── workout-plan-service/      # Spring Boot workout planning
+│   ├── workout-plan-service/      # Spring Boot workout planning
+│   │   ├── Dockerfile
+│   │   ├── pom.xml
+│   │   └── src/
+│   └── tts-service/               # Spring Boot text-to-speech
 │       ├── Dockerfile
 │       ├── pom.xml
 │       └── src/
@@ -302,6 +356,7 @@ team-code-compass/
 | `POSTGRES_USER` | Database user | `flexfit` | ✅ |
 | `POSTGRES_PASSWORD` | Database password | `flexfit_local` | ✅ |
 | `CHAIR_API_KEY` | TUM OpenWebUI API key | - | ✅ |
+| `GOOGLE_APPLICATION_CREDENTIALS` | Google Cloud TTS credentials | - | ✅ |
 
 ### Application Profiles
 - **`default`**: Local development
@@ -313,21 +368,23 @@ Services communicate through the `flexfit-network` Docker network with **Service
 - **API Gateway**: `api-gateway:8000` - Routes to registered services + **CORS handling**
 - **User Service → Database**: `postgres:5432`
 - **Workout Plan Service → Database**: `postgres:5432`
-- **Workout Plan Service → GenAI Worker**: `flexfit-genai-workout-worker:8083`
+- **TTS Service → Google Cloud TTS**: External API integration
+- **Workout Plan Service → GenAI Worker**: `flexfit-genai-workout-worker:8000`
 - **All services register with Eureka** for automatic discovery and load balancing
 
 ## 🔍 Troubleshooting
 
 ### Common Issues
 
-1. **Port conflicts**: Ensure ports 5432, 8000, 8081, 8082, 8083, and 8761 are available
+1. **Port conflicts**: Ensure ports 5432, 8000, 8080, 8081, 8082, 8083, and 8761 are available
 2. **Database connection**: Verify `.env` file exists and has correct credentials
 3. **Container startup**: Check logs with `docker compose logs <service-name>`
 4. **Missing API key**: Ensure `CHAIR_API_KEY` is set in `.env` file
-5. **Service registration timing**: Services may take 30-60s to register with Eureka after startup
-6. **Command not found**: Use `docker compose` (not `docker-compose`) - V2 syntax
-7. **CORS errors**: Use API Gateway routes instead of direct service access for frontend
-8. **API Gateway startup**: Gateway automatically waits 45s for service registration - no manual intervention needed
+5. **TTS credentials**: Ensure Google Cloud TTS credentials are properly configured
+6. **Service registration timing**: Services may take 30-60s to register with Eureka after startup
+7. **Command not found**: Use `docker compose` (not `docker-compose`) - V2 syntax
+8. **CORS errors**: Use API Gateway routes instead of direct service access for frontend
+9. **API Gateway startup**: Gateway automatically waits 45s for service registration - no manual intervention needed
 
 ### ⚡ Service Discovery Timing Issue Fix
 
@@ -359,11 +416,13 @@ curl http://localhost:8000/actuator/health  # API Gateway
 # Test business services (direct access)
 curl http://localhost:8081/actuator/health  # User Service
 curl http://localhost:8082/actuator/health  # Workout Plan Service
-curl http://localhost:8083/health           # GenAI Worker
+curl http://localhost:8083/api/tts/health   # TTS Service
+curl http://localhost:8000/health           # GenAI Worker
 
 # Test via API Gateway (recommended approach)
 curl http://localhost:8000/api/users/health
 curl http://localhost:8000/api/workout-plans/health
+curl http://localhost:8000/api/tts/health
 
 # View registered services in Eureka
 curl http://localhost:8761/eureka/apps -H "Accept: application/json"
@@ -418,6 +477,7 @@ docker compose logs workout-plan-service | grep ERROR
 - **User Management**: Registration, authentication, profile management
 - **Workout Planning**: Exercise scheduling, workout plan generation
 - **AI Integration**: LangChain-powered personalized workout generation
+- **Text-to-Speech**: Google Cloud TTS integration for audio generation
 - **Database**: PostgreSQL with automatic table creation
 - **Containerization**: Full Docker Compose orchestration
 - **API Documentation**: Swagger UI for all REST services
@@ -463,15 +523,19 @@ docker compose logs workout-plan-service | grep ERROR
 8. ✅ Access Swagger UIs:
    - User Service: http://localhost:8081/swagger-ui/index.html
    - Workout Plan Service: http://localhost:8082/swagger-ui/index.html
-9. ✅ Test GenAI Worker: http://localhost:8083/health
-10. ✅ **Test CORS-enabled routes** (for frontend):
+   - TTS Service: http://localhost:8083/swagger-ui/index.html
+9. ✅ Test GenAI Worker: http://localhost:8000/health
+10. ✅ Test TTS Service: http://localhost:8083/api/tts/health
+11. ✅ **Test CORS-enabled routes** (for frontend):
     - `curl -H "Origin: http://localhost:3001" http://localhost:8000/user-service/api/v1/users/register`
     - `curl -H "Origin: http://localhost:3001" http://localhost:8000/api/v1/users/register`
+    - `curl -H "Origin: http://localhost:3001" http://localhost:8000/api/tts/health`
 
 ### 🌟 Frontend Integration Ready!
 Your frontend at `http://localhost:3001` can now make requests to:
 - ✅ `http://localhost:8000/user-service/api/v1/users/register`
 - ✅ `http://localhost:8000/api/v1/users/**`
+- ✅ `http://localhost:8000/api/tts/**`
 - ✅ All CORS preflight and actual requests supported
 - ✅ No duplicate CORS headers
 - ✅ Single, clean CORS policy managed at API Gateway
