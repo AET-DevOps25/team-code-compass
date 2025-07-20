@@ -1,0 +1,1689 @@
+DevOps: Software Engineering, Deployment, and Operation
+
+W05 Cloud Integration and Deployment Platforms
+Stephan Krusche, Ingo Weber
+
+23 May 2025
+
+Schedule
+
+© 2025 Stephan Krusche, Ingo Weber
+
+#
+
+Date
+
+Subject
+
+1
+
+25.04.25
+
+Introduction
+
+2
+
+02.05.25
+
+DevOps Culture and Organization
+
+3
+
+09.05.25
+
+Software Engineering Principles in DevOps
+
+4
+
+16.05.25
+
+Virtualization and Containerization
+
+5
+
+23.05.25
+
+Cloud Integration and Deployment Platforms
+
+6
+
+30.05.25
+
+Continuous Delivery and Deployment Strategies
+
+7
+
+06.06.25
+
+Microservices and Scalable Architectures
+
+8
+
+13.06.25
+
+Monitoring and Observability
+
+9
+
+20.06.25
+
+Post-Deployment Management
+
+10
+
+27.06.25
+
+Security and Compliance in DevOps
+
+11
+
+04.07.25
+
+Advanced DevOps Topics and Trends
+
+12
+
+11.07.25
+
+DevOps for AI-based Systems
+
+13
+
+18.07.25
+
+Guest Workshop
+
+14
+
+25.07.25
+
+Course Review + Test Exam
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+2
+
+Roadmap
+• Context
+•
+•
+•
+•
+
+You have a basic understanding of DevOps
+You understand the culture behind it
+You can apply agile SE, CI and CD
+You have a good understanding of Docker, Docker Compose and Kubernetes
+
+• Learning goals
+•
+•
+•
+•
+
+Explain how deployment strategies affect scalability, resilience, and agility
+Explain different cloud deployment models
+Deploy an application into a cloud infrastructure
+Explain how infrastructure as code enables reproducible, scalable, and maintainable
+infrastructure
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+3
+
+Where did cloud computing start?
+
+Source: https://www.ir.com/guides/iaas-paas-saas
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+4
+
+Outline
+• Deployment models
+• Cloud providers
+• Infrastructure as code
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+5
+
+Deployment models: from on-premise to SaaS
+• Virtualization is the backbone of cloud
+computing
+
+• Virtualization allows managed service providers
+(MSPs) to deliver IT services in 3 models
+1. IaaS: MSP delivers VM to customers
+2. PaaS: MSP delivers environments to customers
+(e.g. database as a service, managed RabbitMQ
+service, etc)
+3. SaaS: MSP delivers entire application for the
+customer
+
+Source: https://www.bmc.com/blogs/saas-vs-paas-vs-iaas-whats-the-difference-and-how-to-choose
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+6
+
+Cloud service models
+
+Source: https://www.stackscale.com/blog/cloud-service-models
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+7
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+Source: https://www.ardoq.com/blog/saas-vs-on-premise
+
+8
+
+On-premise
+• Full responsibility: hardware → network → operating system → applications
+• High control, high maintenance
+• Use cases: banks, secure data centers
+
+Source: https://www.genesesolution.com/blog/on-premises-vs-cloud
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+9
+
+Infrastructure as a service (IaaS)
+• Provider manages: virtualization, hardware, networking
+• You manage: operating system, runtimes, data, applications
+• Example: Amazon Web Services (AWS), Microsoft Azure, Google Cloud, IBM
+Cloud, …
+
+• Advantages
+• Highly exible and highly scalable
+• Accessible by multiple users
+• Cost-effective
+
+fl
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+10
+
+Platform as a service (PaaS)
+•
+•
+•
+•
+
+Provider also manages: operating systems, middleware, runtime
+You manage: application and data
+Examples: Heroku, Google App Engine, Azure App Service
+Advantages
+
+• Accessible by multiple users
+• Scalable: customers can choose from various tiers of computing resources to suit the
+size of their business
+
+• Built on virtualization technology
+• Easy to run without extensive system administration knowledge
+
+• Trade-offs: less control, more speed
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+11
+
+Software as a service (SaaS)
+•
+•
+•
+•
+
+Everything managed by the provider
+You use the software via browser/API
+Examples: GitHub, Google Docs, Salesforce, Adobe Creative Cloud
+Advantages
+
+• Zero deployment: available over the Internet, and usable any time as long as there is
+an internet connection
+
+• Scalable, with different tiers for small, medium and enterprise-level businesses
+• Ideal for small businesses or startups who cannot develop their own software
+applications
+
+• Inclusive, offering security, compliance and maintenance as part of the cost
+
+• Pitfall: minimal customization, vendor lock-in, high costs
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+12
+
+Comparison
+Model
+
+You manage
+
+Provider manages
+
+Example
+
+On-premise
+
+All layers
+
+Nothing
+
+Legacy systems
+
+IaaS
+
+OS, middleware,
+runtime, app
+
+Virtualization,
+storage, networking
+
+AWS EC2
+
+PaaS
+
+App, data
+
+OS, runtime, infra
+
+Heroku, GAE
+
+SaaS
+
+Just usage
+
+Everything
+
+Gmail, Dropbox
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+13
+
+Why deployment models evolve
+• Drivers: cost, scalability, maintenance, agility
+• Question: “should we own the infrastructure or rent it?”
+• Analogy: owning a car vs. using ride-sharing
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+14
+
+AWS academy guide
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+15
+
+AWS academy guide
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+16
+
+AWS academy guide
+
+Choose this here!
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+17
+
+AWS academy guide
+
+Should be your TUM Mail
+
+Set correct time zone
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+18
+
+AWS academy guide
+
+Go the the modules
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+19
+
+AWS academy guide
+
+Access the Learner Lab
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+20
+
+AWS academy guide
+
+Need to accept Terms
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+21
+
+AWS academy guide
+
+See AWS Status
+
+© 2025 Stephan Krusche, Ingo Weber
+
+Start the lap
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+22
+
+AWS academy guide
+Remaining session time
+
+See AWS Status
+
+© 2025 Stephan Krusche, Ingo Weber
+
+Remaining money
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+23
+
+AWS academy guide
+Click here to get SSH Key
+
+Download SSH private Key
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+24
+
+AWS academy guide
+
+Click here to open
+AWS Console
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+25
+
+AWS academy guide
+
+AWS Console
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+26
+
+Outline
+• Deployment models
+• Cloud providers
+• Infrastructure as code
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+27
+
+Overview
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+28
+
+Source: https://www.emma.ms/blog/top-10-cloud-computing-service-providers
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+29
+
+Hybrid and multi-cloud
+• Combine on-premise with cloud (e.g., for compliance)
+• Multi-cloud for redundancy or negotiation leverage
+• Example: Net ix uses AWS + backup on GCP
+
+fl
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+30
+
+Serverless: event-driven and fully abstracted infrastructure
+• De nition: you deploy code, the platform manages runtime and infrastructure
+(pay per execution)
+
+• Also called function as a service (FaaS)
+• Examples: AWS Lambda, Azure Functions, Google Cloud Functions
+• Characteristics
+•
+•
+•
+•
+
+Zero infrastructure management
+Autoscaling to zero
+Stateless functions
+Use case: image processing on S3 upload, cron jobs, lightweight APIs
+
+fi
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+31
+
+Serverless vs. PaaS
+
+Aspect
+
+PaaS (e.g., GAE)
+
+Serverless (e.g., Lambda)
+
+Scaling
+
+Instance-based
+
+Per-function call
+
+Billing
+
+Uptime
+
+Per execution time
+
+Startup latency
+
+Low
+
+Potential cold start
+
+Deployment unit
+
+App
+
+Function
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+32
+
+LLM inference as a service
+•
+•
+•
+•
+
+Conceptually between SaaS and PaaS
+Operationally triggered via FaaS or other compute models
+Example: GPT-4.1 in Microsoft Azure is consumed as a managed API service
+You don’t host or scale the model yourself—you send a prompt, and Azure
+handles the infrastructure, scaling, model optimization, and response
+
+Aspect
+
+Description
+
+Delivery Model
+
+SaaS like (abstracted), exposed via REST API
+
+Provider
+
+Microsoft Azure OpenAI Service
+
+Infrastructure
+
+Fully managed, runs on Azure superclusters (not visible to the user)
+
+Scaling
+
+Handled transparently by Azure (concurrent requests, rate-limited per quota)
+
+Integration Options
+
+Any compute platform (FaaS, PaaS, VM, client-side)
+
+Pricing
+
+Per-token billing
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+33
+
+Privacy and security in cloud deployment models
+• 🧩 Common assumption: “if we run everything ourselves (on-premise), it’s
+private and secure”
+
+• Control over hardware and data location
+• No external access to infrastructure
+• Seen as compliance-friendly, especially in regulated sectors
+
+• 🧨 The misconception: “owning the servers means better security”
+• Reality: security depends on expertise, not ownership
+• On-premise breaches often result from
+• Unpatched systems
+• Weak internal access control
+• Poor logging and monitoring
+
+• “You’re only as secure as your least informed admin”
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+34
+
+🏗 Cloud reality
+• Hyperscalers (AWS, Azure, GCP) have
+•
+•
+•
+•
+
+Dedicated security teams (often 24/7, with red/blue teams)
+Automated patching and hardened systems
+Proven compliance frameworks (ISO 27001, SOC2, etc.)
+Shared responsibility model: cloud provider secures infrastructure, you secure your
+usage
+
+• 🔁 Takeaway message
+• On-premise gives you control—but not necessarily competence
+• Cloud gives you abstraction—but demands accountability
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+35
+
+Pricing and cost considerations
+•
+•
+•
+•
+
+Pricing models: pay-as-you-go, reserved instances, spot pricing
+Hidden costs: bandwidth, cold storage retrieval, API calls
+Cloud calculators: AWS pricing calculator, Azure cost estimator
+FinOps: cost optimization is a skill
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+36
+
+Lock-in and portability
+• APIs are proprietary: migrating between clouds is non-trivial
+• Examples
+• S3 APIs ≠ GCS APIs
+• IAM (identity and access management) roles differ vastly
+
+• Mitigations
+• Use open standards (e.g., open container initiative, Kubernetes)
+• Use infrastructure as code (IaC) and abstraction tools
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+37
+
+Compliance and data residency
+•
+•
+•
+•
+
+Global cloud regions and availability zones
+Sensitive data and legal boundaries (e.g., GDPR, Schrems II)
+Question: can the government potentially access data?
+Azure Germany, Sovereign Cloud, AWS GovCloud
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+38
+
+Exercise W05E01
+Deploy TUM Mensa App to AWS EC2 using docker compose
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+39
+
+W05E01 — 01: AWS academy
+
+Use Search to nd EC2
+
+fi
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+40
+
+W05E01 — 02: AWS academy
+Open EC2 Interface
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+41
+
+W05E01 — 03: AWS academy
+Overview of EC2 resources
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+42
+
+W05E01 — 04: AWS academy
+
+Create a new EC2 instance
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+43
+
+W05E01 — 05: AWS academy
+
+Name your EC2 Instance
+
+Select Ubuntu as OS Image
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+44
+
+W05E01 — 06: AWS academy
+
+Choose vockey as key pair
+
+Make sure HTTP and HTTPS
+are enabled
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+45
+
+W05E01 — 07: AWS academy
+
+Connect to EC2 Instance
+One running instance
+
+Remember public IP
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+46
+
+W05E01 — 08: AWS academy
+
+SSH command to connect
+to the EC2 instance
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+47
+
+W05E01 — 09: AWS academy (reminder)
+
+Download SSH private key
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+48
+
+W05E01 — 10: AWS exercise
+• Switch to your local terminal
+• You can copy the commands using
+https://gist.github.com/robertjndw/d69e282a81e86a965c2dfcf67593a907
+
+Adapt permissions of your
+local private SSH key
+
+chmod 400 Downloads/labsuser.pem
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+49
+
+W05E01 — 11: AWS exercise
+
+Adapt path to your downloaded
+private key and instance url
+
+Adapt based on the EC2 url copied in a previous step
+ssh -i Downloads/labsuser.pem ubuntu@ec2-3-86-214-246.compute-1.amazonaws.com
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+50
+
+W05E01 — 12: AWS exercise
+
+Accept ngerprint
+
+fi
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+51
+
+W05E01 — 13: AWS exercise
+
+Terminal as ubuntu user on the EC2 VM
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+52
+
+W05E01 — 14: AWS exercise
+Commands to add
+docker repo for Ubuntu
+
+# Add Docker's official GPG key:
+sudo apt-get update
+sudo apt-get install ca-certificates curl
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+# Add the repository to Apt sources:
+echo \
+"deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
+$(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" | \
+sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt-get update
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+53
+
+W05E01 — 15: AWS exercise
+
+Commands to install
+Docker on Ubuntu
+
+sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+54
+
+W05E01 — 16: AWS exercise
+
+Allow user to run
+Docker commands
+
+sudo usermod -a -G docker ubuntu
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+55
+
+W05E01 — 17: AWS exercise
+
+Allow user to run
+Docker commands
+
+Log out and
+log in again!
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+56
+
+W05E01 — 18: AWS exercise
+
+Verify that docker and docker
+compose are working
+
+docker --version
+docker compose version
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+57
+
+W05E01 — 19: AWS exercise
+• Now let’s set up the deployment pipeline using Github environments
+• Open https://github.com/AET-DevOps25/w05-template
+• Fork and clone the repository
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+58
+
+W05E01 — 20: AWS exercise
+Go into the settings of
+your repository
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+59
+
+W05E01 — 21: AWS exercise
+
+2. Create new environment
+
+1. Go to the environments
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+60
+
+W05E01 — 22: AWS exercise
+
+Name it “AWS”
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+61
+
+W05E01 — 23: AWS exercise
+
+No variables yet
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+62
+
+W05E01 — 24: AWS exercise
+
+Create ‘AWS_EC2_PRIVATE_KEY’ with
+the downloaded private SSH key
+Create ‘AWS_EC2_USER’
+with the value ‘ubuntu’
+Create ‘EC2_PUBLIC_IP’ with
+the public IP of your instance
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+63
+
+W05E01 — 25: AWS exercise
+Go to the GitHub actions of your repo
+
+Enable the work ows manually
+
+fl
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+64
+
+W05E01 — 26: AWS exercise
+
+2. Run the work ow from
+your main branch
+1. Go to the
+Deploy Docker images work ow
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+fl
+
+fl
+
+© 2025 Stephan Krusche, Ingo Weber
+
+65
+
+W05E01 — 27: AWS exercise
+
+You will nd your
+instance’s URL here
+
+fi
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+66
+
+W05E01 — 28: AWS exercise
+
+Don’t forget to stop your
+instance to save costs
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+67
+
+Break
+
+10 min
+The workshop will continue at 13:20
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+68
+
+Outline
+• Deployment models
+• Cloud providers
+• Infrastructure as code
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+69
+
+Infrastructure as code: automating cloud deployment
+• What you did manually, you can also de ne as code
+
+Source: https://spectralops.io/blog/how-does-infrastructure-as-code-on-aws-work
+DevOps — W05 Cloud Integration and Deployment Platforms
+fi
+
+© 2025 Stephan Krusche, Ingo Weber
+
+70
+
+Recap: what you did
+•
+•
+•
+•
+•
+
+Launch EC2 instance manually via AWS Console
+SSH into instance
+Install required tools (e.g. docker + docker compose)
+Set up users and access rights
+Deploy a client server application using Github actions
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+71
+
+The problem with manual setup
+•
+•
+•
+•
+
+Error-prone and inconsistent
+Time-consuming and hard to scale
+No version control or audit possibilities
+Dif cult handover between teams
+
+• Remember Jez Humble: “if it hurts, do it more frequently, and bring the pain
+forward” → automation
+
+fi
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+72
+
+Infrastructure as code (IaC)
+• De nition: declarative or procedural de nitions of infrastructure in code
+• Treat infrastructure like software
+• Versioned in git
+• Reviewed via pull requests
+• Tested and validated
+
+• Analogy: Docker le for VM setups
+
+fi
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+fi
+
+fi
+
+© 2025 Stephan Krusche, Ingo Weber
+
+73
+
+Terraform
+• Infrastructure as code (IaC) tool developed by HashiCorp
+• Allows you to de ne and manage cloud and on-premises infrastructure using
+con guration les
+
+• Example: provision EC2 instances on AWS (no manual clicks)
+• Tutorial: https://spacelift.io/blog/terraform-ec2-instance
+
+• Build, change, and version infrastructure safely and ef ciently by using a
+consistent work ow to provision and manage all your resources
+
+• Uses a declarative con guration language, HashiCorp con guration
+language (HCL), to describe the desired state of your infrastructure
+
+74
+fi
+
+fi
+
+fi
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+fi
+
+fl
+
+fi
+
+fi
+
+© 2025 Stephan Krusche, Ingo Weber
+
+Terraform
+•
+•
+•
+•
+
+Use case: de ne and deploy EC2, security groups, VPC
+Declarative language (HCL)
+Provider ecosystem (AWS, Azure, GCP, GitHub, Kubernetes, etc.)
+Example
+resource "aws_instance" "app" {
+ami
+= "ami-123456"
+instance_type = "t2.micro"
+}
+
+fi
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+75
+
+Ansible
+• Open source automation platform used for managing, deploying, and
+con guring IT infrastructure
+
+• Automates tasks like software deployment, con guration management, and
+application deployment
+
+• Example: Allows you to install all requirements on the EC2 instance and setup
+everything necessary for the CI/CD pipeline
+
+• Relies on modules that perform speci c actions, such as installing software or
+managing services, and uses YAML for de ning con guration
+
+fi
+
+fi
+
+fi
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+fi
+
+fi
+
+© 2025 Stephan Krusche, Ingo Weber
+
+76
+
+Ansible
+•
+•
+•
+•
+•
+
+Use case: install Docker, con gure services, copy les
+Agentless, uses SSH
+Idempotent: safe to rerun
+Possibility to dry run
+YAML playbooks
+- name: Install Docker
+apt:
+name: docker.io
+state: present
+
+fi
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+fi
+
+© 2025 Stephan Krusche, Ingo Weber
+
+77
+
+Terraform + Ansible = full automation
+• Terraform: create the machine
+• Ansible: con gure the machine
+
+Step
+
+Manual
+
+IaC (Terraform + Ansible)
+
+Launch EC2
+
+Click in console
+
+Terraform script
+
+Install Docker
+
+SSH + apt install
+
+Ansible playbook
+
+Run app
+
+Docker Compose
+
+Ansible + template + systemd task
+
+Rerun after crash
+
+Repeat manually
+
+terraform apply + ansible-playbook
+
+fi
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+78
+
+GitOps and IaC best practices
+•
+•
+•
+•
+
+Version control all infrastructure
+Use CI/CD to deploy infrastructure changes
+Avoid drift: reconcile state regularly
+Secrets: never hard-code, instead use a vault (e.g. HashiCorp Vault) or e.g.
+AWS secrets manager
+
+• Recommendation for Github: store secrets in Settings → Security →
+Secrets and variables → Actions
+
+• Then the CI/CD pipeline has access to them
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+79
+
+From VMs to Kubernetes: the next step
+• Motivation: EC2 + Docker Compose was step one, now let’s go cloud-native
+• Challenge: Kubernetes YAMLs are verbose and hard to manage
+• Solution: Helm – the package manager for Kubernetes
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+80
+
+Helm
+•
+•
+•
+•
+
+De ne, version, and reuse Kubernetes con gurations
+Supports templating, values injection, environment separation
+Analogy: Terraform for K8s apps or Docker Compose for K8s
+Helm charts are packages that contain all the Kubernetes resources needed to
+deploy an application
+
+• Including YAML les for deployments, services, secrets, and con g maps
+• Simplify application deployment and management in Kubernetes by providing a
+structured way to package, version, and share Kubernetes resources
+
+81
+fi
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+fi
+
+fi
+
+fi
+
+© 2025 Stephan Krusche, Ingo Weber
+
+Helm chart example
+# values.yaml
+replicaCount: 2
+image:
+repository: my-app
+tag: latest
+
+# templates/deployment.yaml
+spec:
+replicas: {{ .Values.replicaCount }}
+containers:
+- name: app
+image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+82
+
+IaC tool comparison
+
+Logo
+
+fi
+
+© 2025 Stephan Krusche, Ingo Weber
+
+Tool
+
+Purpose
+
+Scope
+
+Terraform Provision infrastructure
+
+Cloud resources
+(e.g. VM, K8s cluster)
+
+Ansible
+
+Con gure machines/services
+
+SSH targets
+(mostly VMs)
+
+Helm
+
+Deploy K8s applications
+
+Kubernetes clusters
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+83
+
+Exercise W05E02
+Deploy TUM Mensa App to TUM Kubernetes cluster using helm
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+84
+
+W05E02 — 01: Exercise Kubernetes deployment
+1. Open https://rancher.ase.cit.tum.de
+2. Log in with your TUM ID
+3. Access the Student Cluster
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+85
+
+W05E02 — 02: Exercise Kubernetes deployment
+
+You should see this cluster
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+86
+
+W05E02 — 03: Exercise Kubernetes deployment
+Download the kubecon g student.yaml
+
+fi
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+87
+
+W05E02 — 04: Exercise Kubernetes deployment
+1. Download the kubeconfig student.yaml
+
+If you already have something in there create a backup of the le rst!
+
+2. Put the le student.yaml into ~/.kube/config
+
+3. Verify with kubectl config current-context
+
+This should return student
+
+Download the kubecon g student.yaml
+
+fi
+
+fi
+
+fi
+
+fi
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+88
+
+W05E02 — 05: Exercise Kubernetes deployment
+1. Create the namespace in devops25-k8s-demo
+
+Enter the Projects/Namespaces dashboard
+
+Click on Create Namespace
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+89
+
+W05E02 — 06: Exercise Kubernetes deployment
+1. Create the namespace in devops25-k8s-demo
+2. Name your namespace: <tum-id>-devops25
+
+e.g. ge42uff-devops25
+
+Enter the Projects/Namespaces dashboard
+
+Click on Create Namespace
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+90
+
+W05E02 — 07: Exercise Kubernetes deployment
+1. Use the same forked repo of https://github.com/AET-DevOps25/w05-template
+2. Navigate to the local copy
+3. Navigate to helm/canteen-app
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+91
+
+W05E02 — 09: Exercise Kubernetes deployment
+1. Enter the TUM id in values.yml:4
+2. Run the following command in the directory helm/canteen-app
+helm install --namespace <tum-id>-devops25 canteen .
+Enter previously created
+namespace here
+
+3. The deployment command should successfully complete
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+92
+
+W05E02 — 08: Exercise Kubernetes deployment
+1. Enter the TUM id in values.yml:4
+
+Enter previously created
+namespace here
+
+2. Run the following command in the directory
+helm install --namespace <tum-id>-devops25 canteen .
+
+3. The command should successfully complete
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+93
+
+W05E02 — 10: Exercise Kubernetes deployment
+
+Click into your namespace
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+94
+
+W05E02 — 11: Exercise Kubernetes deployment
+
+Go to Ingresses to see the instance URL
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+95
+
+W05E02 — 12: Exercise Kubernetes deployment
+
+Go to client to open app
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+96
+
+W05E02 — 13: Exercise Kubernetes deployment
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+97
+
+Next steps
+• Project work
+• Set up an EC2 instance on AWS academy and deploy your team project
+• Set up Terraform and Ansible scripts in your team repository to automate these steps
+• Set up Kubernetes con gurations (yaml) and Helm charts in your repository to deploy
+your team project into the AET cluster
+
+• Set up Github actions for a docker deployment to AWS and a Kubernetes (helm)
+deployment to the AET cluster
+
+• Read the following tutorials
+• Terraform: https://developer.hashicorp.com/terraform/tutorials/aws-get-started/infrastructure-as-code
+• Ansible + Terraform: https://sonalirajput.hashnode.dev/automating-docker-and-terraform-deployment-with-ansible
+• Helm charts: https://www.baeldung.com/ops/kubernetes-helm
+
+→ Deadline: Friday, May 30, 11:00
+DevOps — W05 Cloud Integration and Deployment Platforms
+fi
+
+© 2025 Stephan Krusche, Ingo Weber
+
+98
+
+Summary
+• Deployment models: On-premise → IaaS → PaaS → SaaS → FaaS
+• Tradeoff between more abstraction and less control
+• Serverless: great for scaling and simplicity, but limited by cold starts and observability
+
+• Cloud providers: AWS, Azure, GCP dominate; differ in tools, pricing, and ecosystem t
+• Cloud trade-offs: abstraction increases speed but reduces transparency—security,
+privacy, and cost optimization require active management (→ misconceptions)
+
+• IaC motivation: cumbersome manual setups highlight need for automation
+• Infrastructure as code
+• Terraform provisions cloud infrastructure
+• Ansible con gures servers
+• Helm manages Kubernetes deployments
+
+• Key insight: reliable DevOps needs infrastructure de ned and deployed as code
+99
+fi
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+fi
+
+fi
+
+© 2025 Stephan Krusche, Ingo Weber
+
+References
+•
+•
+•
+•
+•
+•
+•
+•
+•
+•
+•
+•
+•
+•
+
+https://www.genesesolution.com/blog/on-premises-vs-cloud
+https://www.ardoq.com/blog/saas-vs-on-premise
+https://www.bmc.com/blogs/saas-vs-paas-vs-iaas-whats-the-difference-and-how-to-choose
+https://www.stackscale.com/blog/cloud-service-models
+https://www.ir.com/guides/iaas-paas-saas
+https://www.redhat.com/en/topics/cloud-computing/iaas-vs-paas-vs-saas
+https://www.usu.com/en-us/it-service-management/hybrid-cloud-vs-multi-cloud-whats-the-difference
+https://www.emma.ms/blog/top-10-cloud-computing-service-providers
+https://spectralops.io/blog/how-does-infrastructure-as-code-on-aws-work
+https://spacelift.io/blog/terraform-ec2-instance
+https://developer.hashicorp.com/terraform/tutorials/aws-get-started/infrastructure-as-code
+https://docs.ansible.com
+https://sonalirajput.hashnode.dev/automating-docker-and-terraform-deployment-with-ansible
+https://www.baeldung.com/ops/kubernetes-helm
+
+© 2025 Stephan Krusche, Ingo Weber
+
+DevOps — W05 Cloud Integration and Deployment Platforms
+
+100
+
+
