@@ -144,38 +144,6 @@ genaiWorker:
       cpu: 250m
       memory: 256Mi
 
-<<<<<<< HEAD
-# TTS Service
-ttsService:
-  enabled: true
-  image:
-    repository: ghcr.io/aet-devops25/team-code-compass/tts-service
-    tag: latest
-    pullPolicy: Always
-  replicaCount: 1
-  service:
-    type: ClusterIP
-    port: 8083
-  resources:
-    limits:
-      cpu: 500m
-      memory: 768Mi
-    requests:
-      cpu: 250m
-      memory: 512Mi
-  env: []
-
-# Frontend
-frontend:
-  enabled: true
-  image:
-    repository: ghcr.io/aet-devops25/team-code-compass/frontend
-    tag: latest
-    pullPolicy: Always
-=======
-# GenAI Worker Local Configuration
-genaiWorkerLocal:
->>>>>>> 8ee4364d68a838d9dfdbb262658698d1e9f4ec0b
   replicaCount: 1
   image:
     repository: ghcr.io/aet-devops25/team-code-compass/genai-worker-local

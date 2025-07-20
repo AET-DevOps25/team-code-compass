@@ -44,19 +44,6 @@ spring:
           filters:
             - RewritePath=/workout-plan-service/(?<segment>.*), /${segment}
 
-<<<<<<< HEAD
-        # TTS service routes via service discovery path
-        - id: tts-service-discovery
-          uri: lb://tts-service
-          predicates:
-            - Path=/tts-service/**
-          filters:
-            - RewritePath=/tts-service/(?<segment>.*), /${segment}
-
-        # Direct Swagger UI access for user service
-=======
-        # Swagger UI for user service - with proper configuration
->>>>>>> 8ee4364d68a838d9dfdbb262658698d1e9f4ec0b
         - id: user-service-swagger-ui
           uri: lb://user-service
           predicates:
@@ -72,19 +59,6 @@ spring:
           filters:
             - StripPrefix=1
 
-<<<<<<< HEAD
-        # Direct Swagger UI access for TTS service
-        - id: tts-service-swagger-ui
-          uri: lb://tts-service
-          predicates:
-            - Path=/tts-service/swagger-ui/**
-          filters:
-            - StripPrefix=1
-
-        # API docs for user service
-=======
-        # API docs for user service - with proper path handling
->>>>>>> 8ee4364d68a838d9dfdbb262658698d1e9f4ec0b
         - id: user-service-v3-api-docs
           uri: lb://user-service
           predicates:
@@ -100,26 +74,6 @@ spring:
           filters:
             - StripPrefix=1
 
-<<<<<<< HEAD
-        # API docs for TTS service
-        - id: tts-service-v3-api-docs
-          uri: lb://tts-service
-          predicates:
-            - Path=/tts-service/v3/api-docs/**
-=======
-        # Webjars support for Swagger UI assets
-        - id: user-service-webjars
-          uri: lb://user-service
-          predicates:
-            - Path=/user-service/webjars/**
-          filters:
-            - StripPrefix=1
-
-        - id: workout-plan-service-webjars
-          uri: lb://workout-plan-service
-          predicates:
-            - Path=/workout-plan-service/webjars/**
->>>>>>> 8ee4364d68a838d9dfdbb262658698d1e9f4ec0b
           filters:
             - StripPrefix=1
 
