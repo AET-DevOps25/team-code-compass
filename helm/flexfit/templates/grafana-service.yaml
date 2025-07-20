@@ -1,0 +1,19 @@
+{{- if .Values.monitoring.grafana.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "flexfit.fullname" . }}-grafana
+  labels:
+    {{- include "flexfit.labels" . | nindent 4 }}
+    app.kubernetes.io/component: grafana
+spec:
+  type: {{ .Values.monitoring.grafana.service.type | default "ClusterIP" }}
+  ports:
+    - port: {{ .Values.monitoring.grafana.service.port | default 3001 }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "flexfit.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: grafana
+{{- end }} 
